@@ -1,0 +1,20 @@
+# Binarios y salidas de compilación
+/bin/
+*.exe
+*.test
+*.out
+
+# Datos y secretos locales
+/data/
+.env
+
+# Archivos de Blender usados en mediciones
+*.blend
+*.blend[0-9]*
+*.blend@
+
+# Skills de agentes: cada desarrollador instala las suyas
+/agent/
+/.agents/
+/.claude/
+/skills-lock.json
