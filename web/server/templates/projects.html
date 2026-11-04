@@ -1,0 +1,49 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <h1>Proyectos</h1>
+    <p class="sub">{{.Data.Summary}}</p>
+  </div>
+</div>
+
+<div class="panel table-panel new-project-list">
+  {{if .Data.Projects}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Proyecto</th><th class="n">Archivos</th><th class="n">Bloqueados</th><th class="n">Tamaño actual</th><th class="n">Última subida</th></tr></thead>
+      <tbody>
+      {{range .Data.Projects}}
+        <tr>
+          <td><a class="name" href="/projects/{{.ID}}">{{.Name}}</a>{{if .Description}}<span class="sub">{{.Description}}</span>{{end}}</td>
+          <td class="n" data-label="Archivos:">{{.Assets}}</td>
+          <td class="n" data-label="Bloqueados:">{{.Locked}}</td>
+          <td class="n" data-label="Tamaño:">{{formatBytes .TotalBytes}}</td>
+          <td class="n" data-label="Última subida:">{{if .LastUpload}}{{when .LastUpload}}{{else}}—{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">Todavía no hay proyectos. Crea el primero aquí abajo.</p>
+  {{end}}
+</div>
+
+<section class="settings-row">
+  <div>
+    <h2>Nuevo proyecto</h2>
+    <p>Cada proyecto es una carpeta que los modeladores eligen sincronizar. Su nombre será el de esa carpeta.</p>
+  </div>
+  <form class="panel form-grid" method="post" action="/projects">
+    <div class="field">
+      <label for="name">Nombre</label>
+      <input class="input" id="name" name="name" required maxlength="100" value="{{.Data.FormName}}">
+    </div>
+    <div class="field">
+      <label for="description">Descripción</label>
+      <input class="input" id="description" name="description" maxlength="300" value="{{.Data.FormDescription}}">
+    </div>
+    <div class="wide form-foot"><button class="btn primary" type="submit">Crear proyecto</button></div>
+  </form>
+</section>
+{{end}}

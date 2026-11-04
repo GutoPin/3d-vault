@@ -1,0 +1,44 @@
+{{define "brand"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="cube-face" d="M12 12.5 20 8v8.8l-8 4.7z"/><path class="cube-edge" d="M12 2.8 20 8v8.8l-8 4.7-8-4.7V8zM4 8l8 4.5L20 8M12 12.5v9"/></svg>{{end -}}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false}'>
+<title>{{.Title}} · 3D-Vault</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+{{if .User -}}
+<input type="checkbox" id="menu" class="menu-check" aria-label="Abrir el menú">
+<div class="phone-bar">
+  <a class="brand" href="/">{{template "brand"}}3D-Vault</a>
+  <label class="btn menu-toggle" for="menu">Menú</label>
+</div>
+<div class="app">
+  <nav class="sidebar" aria-label="Principal">
+    <label class="btn ghost close-menu" for="menu">Cerrar</label>
+    <a class="brand" href="/">{{template "brand"}}3D-Vault</a>
+    <div class="group-label">Proyectos</div>
+    <a class="nav-item" href="/"{{if eq .Active "projects"}} aria-current="page"{{end}}>Todos los proyectos</a>
+    {{range .Projects}}<a class="nav-item" href="/projects/{{.ID}}"{{if eq $.ActiveProject .ID}} aria-current="page"{{end}}><span class="nav-name">{{.Name}}</span></a>
+    {{end}}
+    {{if .User.IsAdmin}}<div class="group-label">Administración</div>
+    <a class="nav-item" href="/admin/users"{{if eq .Active "users"}} aria-current="page"{{end}}>Usuarios</a>{{end}}
+    <div class="bottom user-row">
+      <div class="who">{{.User.DisplayName}}<span>{{.User.Username}}</span></div>
+      <form method="post" action="/logout"><button class="btn" type="submit">Salir</button></form>
+    </div>
+  </nav>
+  <main class="canvas">
+    {{if .Error}}<p class="notice" role="alert">{{.Error}}</p>{{end}}
+    {{template "content" .}}
+  </main>
+</div>
+{{- else -}}
+<main>{{template "content" .}}</main>
+{{- end}}
+</body>
+</html>

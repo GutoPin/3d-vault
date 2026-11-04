@@ -145,6 +145,7 @@ func printFile(out io.Writer, label, path string, s stats) {
 	}
 	fmt.Fprintf(out, "%-12s %s\n", label, path)
 	fmt.Fprintf(out, "             %s, %s, %d trozos, %.0f MiB/s\n", formatBytes(s.size), s.format, s.chunks, speed)
+	fmt.Fprintf(out, "             Repetido dentro del archivo: %s (%.1f %%)\n", formatBytes(s.repeatBytes), percent(s.repeatBytes, s.size))
 }
 
 func formatBytes(n int64) string {

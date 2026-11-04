@@ -1,0 +1,54 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <div class="crumbs"><a href="/">Proyectos</a></div>
+    <h1 class="path">{{.Data.Project.Name}}</h1>
+    <p class="sub">{{.Data.Summary}}</p>
+  </div>
+</div>
+
+<div id="asset-list">
+  <nav class="tabs" aria-label="Filtrar archivos">
+    {{range .Data.Tabs}}<a href="{{.Href}}"{{if .Selected}} aria-selected="true"{{end}}>{{.Label}}<span>{{.Count}}</span></a>{{end}}
+  </nav>
+
+  <div class="toolbar">
+    <form method="get" action="/projects/{{.Data.Project.ID}}" role="search"
+          hx-get="/projects/{{.Data.Project.ID}}" hx-trigger="input changed delay:250ms from:#q" hx-target="#asset-table" hx-select="#asset-table" hx-swap="outerHTML" hx-push-url="true">
+      {{if .Data.State}}<input type="hidden" name="estado" value="{{.Data.State}}">{{end}}
+      <input class="input" id="q" type="search" name="q" value="{{.Data.Query}}" placeholder="Buscar por nombre o carpeta" aria-label="Buscar archivo">
+    </form>
+  </div>
+
+  <div id="asset-table">
+    <div class="panel table-panel">
+      {{if .Data.Rows}}
+      <div class="table-wrap">
+        <table class="stack-table tree-table">
+          <thead><tr><th>Archivo</th><th class="n col-version">Versión</th><th class="n col-size">Tamaño</th><th class="col-lock">Bloqueo</th><th class="n col-date">Última subida</th></tr></thead>
+          <tbody>
+          {{range .Data.Rows}}
+            {{if .Folder}}
+            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}">{{.Name}}/</span></td></tr>
+            {{else}}
+            <tr>
+              <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a></span></td>
+              <td class="n" data-label="Versión:">v{{.Asset.HeadVersion}}</td>
+              <td class="n" data-label="Tamaño:">{{formatBytes .Asset.SizeBytes}}</td>
+              <td>{{template "lock-mark" .Asset.Lock}}</td>
+              <td class="n">{{when .Asset.UpdatedAt}}<span class="sub">{{.Asset.UploadedBy}}</span></td>
+            </tr>
+            {{end}}
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <p class="empty">{{.Data.EmptyMessage}}</p>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "lock-mark"}}{{if .}}<span class="lock-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{.DisplayName}}</span>{{else}}<span class="free">Libre</span>{{end}}{{end}}

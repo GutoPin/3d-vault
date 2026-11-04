@@ -1,0 +1,7 @@
+{$DOMAIN} {
+	tls internal
+
+	reverse_proxy server:8080 {
+		flush_interval -1
+	}
+}

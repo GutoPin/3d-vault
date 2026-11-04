@@ -1,0 +1,76 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <h1>Usuarios</h1>
+    <p class="sub">{{.Data.Summary}}</p>
+  </div>
+</div>
+
+<div class="panel table-panel">
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {{range .Data.Users}}
+        <tr>
+          <td><span class="name">{{.DisplayName}}</span></td>
+          <td>{{.Username}}</td>
+          <td>{{if .IsAdmin}}Administrador{{else}}Modelador{{end}}</td>
+          <td>{{if .IsActive}}<span class="pill pos">Activo</span>{{else}}<span class="pill">Desactivado</span>{{end}}</td>
+          <td class="row-actions">
+            <form method="post" action="/admin/users/{{.ID}}/active">
+              <input type="hidden" name="active" value="{{if .IsActive}}0{{else}}1{{end}}">
+              <button class="text-action" type="submit">{{if .IsActive}}Desactivar{{else}}Activar{{end}}</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<section class="settings-row">
+  <div>
+    <h2>Nueva cuenta</h2>
+    <p>No hay registro público: las cuentas se crean aquí. Pasa la contraseña a la persona por un canal privado.</p>
+  </div>
+  <form class="panel form-grid" method="post" action="/admin/users">
+    <div class="field">
+      <label for="username">Usuario</label>
+      <input class="input" id="username" name="username" required autocapitalize="none" autocomplete="off" value="{{.Data.FormUsername}}">
+    </div>
+    <div class="field">
+      <label for="display_name">Nombre visible</label>
+      <input class="input" id="display_name" name="display_name" maxlength="100" value="{{.Data.FormDisplayName}}">
+    </div>
+    <div class="field wide">
+      <label for="password">Contraseña</label>
+      <input class="input" id="password" name="password" type="password" required minlength="10" autocomplete="new-password" aria-describedby="password-hint">
+      <span class="hint" id="password-hint">Al menos 10 caracteres.</span>
+    </div>
+    <label class="check wide"><input type="checkbox" name="is_admin" value="1"{{if .Data.FormAdmin}} checked{{end}}>Es administrador</label>
+    <div class="wide form-foot"><button class="btn primary" type="submit">Crear cuenta</button></div>
+  </form>
+</section>
+
+<section class="settings-row">
+  <div>
+    <h2>Cambiar una contraseña</h2>
+    <p>Cierra las sesiones de esa persona y revoca sus tokens: tendrá que volver a conectar su agente.</p>
+  </div>
+  <form class="panel form-grid" method="post" action="/admin/users/password">
+    <div class="field">
+      <label for="target">Cuenta</label>
+      <select class="input" id="target" name="user_id" required>
+        {{range .Data.Users}}<option value="{{.ID}}">{{.DisplayName}} ({{.Username}})</option>{{end}}
+      </select>
+    </div>
+    <div class="field">
+      <label for="new_password">Contraseña nueva</label>
+      <input class="input" id="new_password" name="password" type="password" required minlength="10" autocomplete="new-password">
+    </div>
+    <div class="wide form-foot"><button class="btn" type="submit">Cambiar contraseña</button></div>
+  </form>
+</section>
+{{end}}

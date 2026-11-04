@@ -1,0 +1,8 @@
+{$DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+
+	reverse_proxy server:8080 {
+		# Entrega los eventos de sincronización al momento.
+		flush_interval -1
+	}
+}

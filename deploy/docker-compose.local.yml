@@ -1,0 +1,10 @@
+# Para probar en una sola máquina, con un certificado propio de Caddy:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+services:
+  caddy:
+    ports: !override
+      - "8443:443"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config

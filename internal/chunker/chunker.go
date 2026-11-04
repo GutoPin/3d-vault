@@ -39,6 +39,33 @@ func (h Hash) String() string {
 	return hex.EncodeToString(h[:])
 }
 
+// ParseHash interpreta un hash en hexadecimal.
+func ParseHash(s string) (Hash, error) {
+	var h Hash
+	if len(s) != hex.EncodedLen(len(h)) {
+		return Hash{}, fmt.Errorf("hash de longitud incorrecta: %d", len(s))
+	}
+	if _, err := hex.Decode(h[:], []byte(s)); err != nil {
+		return Hash{}, fmt.Errorf("hash no válido: %w", err)
+	}
+	return h, nil
+}
+
+// MarshalText permite usar Hash en JSON como hexadecimal.
+func (h Hash) MarshalText() ([]byte, error) {
+	return []byte(h.String()), nil
+}
+
+// UnmarshalText permite leer Hash desde JSON.
+func (h *Hash) UnmarshalText(text []byte) error {
+	parsed, err := ParseHash(string(text))
+	if err != nil {
+		return err
+	}
+	*h = parsed
+	return nil
+}
+
 // Chunk es un trozo del flujo.
 type Chunk struct {
 	// Offset es la posición del trozo dentro del flujo.
