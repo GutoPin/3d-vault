@@ -1,5 +1,5 @@
 // Interfaz de "Mi carpeta". La lógica de sincronización está en engine.js.
-import { Api, ApiError, Project } from './engine.js';
+import { Api, ApiError, Project, ignored, keyOf } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTO_EVERY = 60_000;
@@ -84,7 +84,6 @@ const ui = {
   progress: new Map(),
   paused: false,
   running: false,
-  again: false,
   busy: 0,
   stream: null,
 };
@@ -125,7 +124,7 @@ function fail(err) {
   if (err instanceof ApiError && err.status === 401) {
     ui.paused = true;
     notice('Tu sesión terminó. Vuelve a entrar para seguir sincronizando.');
-    setTimeout(() => location.assign('/login'), 3000);
+    setTimeout(() => location.assign('/login?next=/sync'), 3000);
     return;
   }
   if (err?.name === 'NotReadableError') {
@@ -173,7 +172,14 @@ function rowActions(pid, row) {
 function statusCell(row) {
   const p = ui.progress.get(row.key);
   if (p && p.done < p.total) {
-    return el('td', {}, `${p.action} ${Math.floor((100 * p.done) / p.total)} %`, el('progress', { max: p.total, value: p.done }));
+    let rate = '';
+    const secs = (performance.now() - p.t0) / 1000;
+    if (secs > 1 && p.done > p.d0) {
+      const speed = (p.done - p.d0) / secs;
+      const left = Math.ceil((p.total - p.done) / speed);
+      rate = ` · ${formatBytes(speed)}/s · ${left < 60 ? `${left} s` : `${Math.ceil(left / 60)} min`}`;
+    }
+    return el('td', {}, `${p.action} ${Math.floor((100 * p.done) / p.total)} %${rate}`, el('progress', { max: p.total, value: p.done }));
   }
   let text = STATUS[row.status] || '';
   if (row.status === 'error') text = `Error: ${row.error}`;
@@ -190,7 +196,8 @@ function render() {
   for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
     const engine = ui.engines.get(p.id);
     const rows = engine?.rows ?? [];
-    pending += rows.filter((r) => ['changed', 'new', 'error'].includes(r.status)).length;
+    const toUpload = rows.filter((r) => r.status === 'changed' || r.status === 'new').length;
+    pending += toUpload + rows.filter((r) => r.status === 'error').length;
     const body = rows.map((row) => el('tr', {},
       el('td', {}, row.asset ? el('a', { class: 'name', href: `/assets/${row.asset.id}` }, row.asset.path) : el('span', { class: 'name' }, row.local.path)),
       el('td', { class: 'n' }, row.asset ? `v${row.asset.head_version}` : '—'),
@@ -199,17 +206,20 @@ function render() {
       el('td', { class: 'row-actions' }, ...rowActions(p.id, row)),
     ));
     box.append(
-      el('div', { class: 'ledger-head' }, el('h2', {}, p.name), el('p', {}, `Carpeta: ${safeName(p.name)}`)),
-      el('div', { class: 'panel table-panel' }, rows.length
+      el('div', { class: 'ledger-head' }, el('h2', {}, p.name),
+        el('p', {}, `Carpeta: ${safeName(p.name)}`, toUpload > 1 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id }, `Subir todo (${toUpload})`))),
+      el('div', { class: 'panel table-panel drop-zone', 'data-drop': p.id }, rows.length
         ? el('div', { class: 'table-wrap' }, el('table', { class: 'stack-table' },
             el('thead', {}, el('tr', {}, el('th', {}, 'Archivo'), el('th', { class: 'n' }, 'Versión'), el('th', { class: 'n' }, 'Tamaño'), el('th', {}, 'Estado'), el('th', {}, ''))),
             el('tbody', {}, ...body)))
-        : el('p', { class: 'empty' }, engine ? 'Este proyecto todavía no tiene archivos. Copia archivos en su carpeta y pulsa Sincronizar ahora.' : 'Sincronizando…')),
+        : el('p', { class: 'empty' }, engine ? 'Este proyecto todavía no tiene archivos. Arrástralos aquí o cópialos en su carpeta.' : 'Sincronizando…'),
+        engine && rows.length > 0 && el('p', { class: 'drop-hint' }, 'Arrastra aquí archivos o carpetas para agregarlos al proyecto.')),
     );
   }
   if (!ui.selected.size) box.append(el('p', { class: 'empty' }, 'Marca arriba los proyectos que quieres tener en esta PC.'));
   const state = ui.paused ? 'Sincronización en pausa.' : ui.running ? 'Sincronizando…' : 'Sincronización automática activa.';
   $('sync-summary').textContent = pending ? `${state} ${pending} archivo(s) esperan que hagas algo.` : state;
+  document.title = `${pending ? `(${pending}) ` : ''}Mi carpeta · 3D-Vault`;
   $('pause-btn').textContent = ui.paused ? 'Reanudar' : 'Pausar';
 }
 
@@ -233,10 +243,16 @@ async function engineFor(p) {
   if (!engine) {
     const dir = await ui.root.getDirectoryHandle(safeName(p.name), { create: true });
     engine = new Project({
-      api: ui.api, me: ui.me, clientId: ui.clientId, project: p, root: dir, state: stateFor(p.id), log,
+      api: ui.api, me: ui.me, clientId: ui.clientId, project: p, root: dir, state: stateFor(p.id),
+      log: (text) => {
+        log(text);
+        notify(text);
+      },
       progress: (pr) => {
+        const prev = ui.progress.get(pr.key);
+        const same = prev?.action === pr.action;
         if (pr.done >= pr.total) ui.progress.delete(pr.key);
-        else ui.progress.set(pr.key, pr);
+        else ui.progress.set(pr.key, { ...pr, t0: same ? prev.t0 : performance.now(), d0: same ? prev.d0 : pr.done });
         scheduleRender();
       },
     });
@@ -257,12 +273,23 @@ function scheduleRender() {
 
 const confirmFirst = (n, bytes) => Promise.resolve(confirm(`Se descargarán ${n} archivo(s), ${formatBytes(bytes)} en total. ¿Empezar?`));
 
-async function syncAll(manual = false) {
-  if (!ui.root || (ui.paused && !manual)) return;
-  if (ui.running) {
-    ui.again = true;
-    return;
+// syncAll pone en cola una pasada completa. La promesa se cumple al terminar una
+// pasada que empezó después de la llamada, así quien espera ve lo último.
+let current = Promise.resolve();
+let waiting = null;
+function syncAll(manual = false) {
+  if (!ui.root || (ui.paused && !manual)) return Promise.resolve();
+  if (!waiting) {
+    waiting = current.then(() => {
+      waiting = null;
+      return syncOnce(manual);
+    });
+    current = waiting;
   }
+  return waiting;
+}
+
+async function syncOnce(manual) {
   ui.running = true;
   ui.busy++;
   render();
@@ -279,10 +306,6 @@ async function syncAll(manual = false) {
     ui.running = false;
     ui.busy--;
     render();
-    if (ui.again) {
-      ui.again = false;
-      syncAll();
-    }
   }
 }
 
@@ -308,17 +331,43 @@ async function run(fn) {
   }
 }
 
-function askUpload(row) {
+// askComment pide el comentario de una subida. Devuelve null si se cancela.
+function askComment(title, comment, canRelease) {
   const dialog = $('upload-dialog');
-  $('upload-title').textContent = row.asset ? `Subir ${row.asset.path}` : `Agregar ${row.local.path}`;
-  $('upload-comment').value = row.asset ? '' : 'Primera versión';
-  $('upload-release-row').hidden = !row.lockedByMe;
+  $('upload-title').textContent = title;
+  $('upload-comment').value = comment;
+  $('upload-release-row').hidden = !canRelease;
   dialog.returnValue = '';
   dialog.showModal();
   return new Promise((resolve) => {
     dialog.addEventListener('close', () => {
-      resolve(dialog.returnValue === 'ok' ? { comment: $('upload-comment').value.trim(), release: row.lockedByMe && $('upload-release').checked } : null);
+      resolve(dialog.returnValue === 'ok' ? { comment: $('upload-comment').value.trim(), release: canRelease && $('upload-release').checked } : null);
     }, { once: true });
+  });
+}
+
+const askUpload = (row) => askComment(row.asset ? `Subir ${row.asset.path}` : `Agregar ${row.local.path}`, row.asset ? '' : 'Primera versión', row.lockedByMe);
+
+// uploadMany sube varios archivos con el mismo comentario, uno tras otro.
+async function uploadMany(engine, keys, title) {
+  const rows = () => engine.rows.filter((r) => keys.has(r.key) && (r.status === 'changed' || r.status === 'new'));
+  const list = rows();
+  if (!list.length) return;
+  const allNew = list.every((r) => r.status === 'new');
+  const answer = await askComment(`${title} (${list.length})`, allNew ? 'Primera versión' : '', list.some((r) => r.lockedByMe));
+  if (!answer) return;
+  await run(async () => {
+    const failed = [];
+    for (const row of list) {
+      try {
+        const r = await engine.upload(row, answer.comment, answer.release && row.lockedByMe);
+        log(`${row.asset?.path ?? row.local.path}: ${r.noChanges ? 'sin cambios' : `subido como v${r.version}`}.`);
+      } catch (err) {
+        failed.push(`${row.local.path}: ${err.message}`);
+      }
+    }
+    if (failed.length) notice(`No se pudieron subir ${failed.length}: ${failed.join(' · ')}`);
+    else notice(`Listo: ${list.length} archivo(s) subidos.`, true);
   });
 }
 
@@ -359,6 +408,17 @@ const actions = {
       log(`${row.asset?.path ?? row.local.path}: ${msg}`);
     });
   },
+  'upload-all': (engine) => uploadMany(engine, new Set(engine.rows.map((r) => r.key)), 'Subir todo'),
+  install: async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt = null;
+    renderComforts();
+  },
+  notify: async () => {
+    await Notification.requestPermission();
+    renderComforts();
+  },
   restore: (engine, row) => run(() => engine.restoreMissing(row)),
   delete: (engine, row) => run(async () => {
     if (!confirm(`¿Borrar ${row.asset.path} del servidor? Desaparecerá de las PCs de todos. El administrador puede recuperarlo hasta la próxima limpieza.`)) return;
@@ -374,6 +434,7 @@ document.addEventListener('click', (e) => {
   if (!fn) return;
   if (!btn.dataset.project) return fn();
   const engine = ui.engines.get(Number(btn.dataset.project));
+  if (!btn.dataset.key) return engine && fn(engine);
   const row = engine?.rows.find((r) => r.key === btn.dataset.key);
   if (row) fn(engine, row);
 });
@@ -404,6 +465,82 @@ addEventListener('beforeunload', (e) => {
 // Al volver de Blender se revisa enseguida si guardaste algo.
 addEventListener('focus', () => syncAll());
 
+// ---------- comodidades: instalar como app, avisos y arrastrar y soltar ----------
+
+let installPrompt = null;
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  renderComforts();
+});
+
+const installed = () => matchMedia('(display-mode: standalone)').matches;
+
+function renderComforts() {
+  $('install-btn').hidden = !installPrompt;
+  $('install-done').hidden = !installed();
+  $('install-how').hidden = Boolean(installPrompt) || installed();
+  const perm = 'Notification' in window ? Notification.permission : 'denied';
+  $('notify-btn').hidden = perm !== 'default';
+  $('notify-state').textContent = perm === 'granted' ? 'Activados.' : perm === 'denied' ? 'Bloqueados en este navegador.' : '';
+}
+
+function notify(text) {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || document.visibilityState === 'visible') return;
+  new Notification('3D-Vault', { body: text, icon: '/static/app/icon-192.png', tag: text });
+}
+
+// copyIn copia lo soltado dentro de la carpeta del proyecto, carpetas incluidas.
+// Devuelve las claves de los archivos copiados.
+async function copyIn(dir, handle, prefix, keys) {
+  if (handle.kind === 'directory') {
+    const sub = await dir.getDirectoryHandle(handle.name, { create: true });
+    for await (const child of handle.values()) await copyIn(sub, child, `${prefix}${handle.name}/`, keys);
+    return;
+  }
+  if (ignored(handle.name)) return;
+  const exists = await dir.getFileHandle(handle.name).then(() => true, () => false);
+  if (exists && !confirm(`Ya hay un ${prefix}${handle.name} en la carpeta. ¿Reemplazarlo por el que arrastraste? Si tenía cambios sin subir, se perderán.`)) return;
+  const file = await handle.getFile();
+  const out = await (await dir.getFileHandle(handle.name, { create: true })).createWritable();
+  await file.stream().pipeTo(out);
+  keys.add(keyOf(prefix + handle.name));
+}
+
+document.addEventListener('dragover', (e) => {
+  const zone = e.target.closest?.('[data-drop]');
+  if (!zone) return;
+  e.preventDefault();
+  zone.classList.add('dragging');
+});
+
+document.addEventListener('dragleave', (e) => e.target.closest?.('[data-drop]')?.classList.remove('dragging'));
+
+document.addEventListener('drop', (e) => {
+  const zone = e.target.closest?.('[data-drop]');
+  if (!zone) return;
+  e.preventDefault();
+  zone.classList.remove('dragging');
+  const engine = ui.engines.get(Number(zone.dataset.drop));
+  // Hay que pedir los handles antes de cualquier await: después el evento caduca.
+  const handles = [...e.dataTransfer.items].filter((i) => i.kind === 'file').map((i) => i.getAsFileSystemHandle());
+  if (!engine || !handles.length) return;
+  (async () => {
+    const keys = new Set();
+    ui.busy++;
+    try {
+      for (const h of await Promise.all(handles)) if (h) await copyIn(engine.root, h, '', keys);
+    } catch (err) {
+      fail(err);
+    } finally {
+      ui.busy--;
+    }
+    if (!keys.size) return;
+    await syncAll(true);
+    await uploadMany(engine, keys, 'Agregar lo que arrastraste');
+  })();
+});
+
 async function pickFolder() {
   try {
     const root = await showDirectoryPicker({ id: '3dvault', mode: 'readwrite' });
@@ -418,6 +555,7 @@ async function pickFolder() {
 
 function startMain() {
   $('root-name').textContent = ui.root.name;
+  renderComforts();
   show('sync-main');
   renderPicks();
   render();
@@ -458,4 +596,4 @@ setInterval(() => syncAll(), AUTO_EVERY);
 const ready = main();
 
 // Para pruebas automáticas: permite usar una carpeta sin el selector.
-window.__3dvault = { ui, useFolder: async (root) => { await ready; ui.root = root; ui.engines.clear(); startMain(); } };
+window.__3dvault = { ui, copyIn, useFolder: async (root) => { await ready; ui.root = root; ui.engines.clear(); startMain(); } };

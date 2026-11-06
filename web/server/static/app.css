@@ -342,3 +342,26 @@ td .sub { display: block; color: var(--muted); font-size: var(--fs-small); }
 dialog.panel { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--border); }
 dialog::backdrop { background: rgb(10 10 10 / 0.35); }
 .facts + .table-panel { margin-top: var(--gap); }
+.ledger-head p .btn { margin-left: 12px; height: 30px; }
+.drop-zone { transition: border-color var(--t-hover) ease, background-color var(--t-hover) ease; }
+.drop-zone.dragging { border: 1px dashed var(--accent); background: var(--active); }
+.drop-hint { padding: 10px 20px; color: var(--muted); font-size: var(--fs-small); border-top: 1px solid var(--rule); }
+.comforts { display: grid; gap: 16px; }
+.comfort { display: flex; gap: 24px; align-items: center; justify-content: space-between; }
+.comforts .sub { margin-top: 4px; }
+
+/* ---------- vistas previas ---------- */
+.preview { display: grid; place-items: center; min-height: 160px; }
+.preview-thumb { width: 192px; height: auto; border-radius: var(--radius-control); }
+.preview-image { width: auto; max-height: 70vh; object-fit: contain; }
+.preview-none { display: grid; justify-items: center; gap: 12px; max-width: 44ch; color: var(--muted); text-align: center; }
+.preview-none svg { width: 48px; height: 48px; }
+.preview-none .cube-edge { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.preview-none .cube-face { fill: var(--active); }
+.preview-model { display: block; padding: 0; overflow: hidden; }
+.viewer { position: relative; }
+.viewer canvas { width: 100%; height: min(60vh, 560px); background: var(--ground); }
+.viewer-large { position: absolute; inset: 0 0 auto; height: min(60vh, 560px); display: grid; place-content: center; justify-items: center; gap: 12px; padding: 16px; background: var(--surface); color: var(--muted); text-align: center; }
+.viewer-large[hidden] { display: none; }
+.viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 53px; padding: 8px var(--card-pad); border-top: 1px solid var(--border); }
+.viewer-note { color: var(--muted); }

@@ -1,0 +1,17 @@
+{
+  "name": "3D-Vault",
+  "short_name": "3D-Vault",
+  "description": "Archivos 3D del equipo, con versiones y sincronización.",
+  "lang": "es",
+  "start_url": "/sync",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f4f7",
+  "theme_color": "#f2f4f7",
+  "launch_handler": { "client_mode": "focus-existing" },
+  "icons": [
+    { "src": "/static/app/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/app/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/app/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

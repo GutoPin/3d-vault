@@ -26,13 +26,22 @@ sudo docker compose exec -it server 3dvault-server create-admin --username admin
 - **Proyectos:** cualquiera puede crearlos desde **Todos los proyectos**. El nombre del proyecto es el nombre de su carpeta en cada PC.
 - **Desbloqueo forzado:** en la ficha de un archivo bloqueado, el admin ve **Forzar desbloqueo**. Úsalo solo si la persona no puede liberarlo; si tenía cambios sin subir, quedan solo en su PC.
 
+## Sesiones
+
+`SESSION_HOURS` en `.env` fija cuánto dura una sesión. Con 12 horas, quien deje 3D-Vault abriéndose al iniciar Windows escribirá su contraseña cada día. Para un equipo interno, `SESSION_HOURS=168` (una semana) es más cómodo. Cambiar la contraseña de alguien cierra sus sesiones en cualquier caso.
+
 ## Qué entregar a cada modelador
 
 Por un canal privado:
 
 1. La dirección: `https://TU_DOMINIO/sync`
 2. Su usuario y su contraseña.
-3. La guía [`GUIA_USUARIO.md`](GUIA_USUARIO.md).
+3. La guía [`GUIA_USUARIO.md`](GUIA_USUARIO.md). Que sigan el apartado para instalarla como aplicación y abrirla al iniciar sesión: es lo que hace que la sincronización sea automática.
+
+## Vistas previas
+
+- **Miniaturas de `.blend`:** salen del propio archivo, si se guardó con *Save Preview Images*. Se generan al subir y se guardan en `DATA_DIR/thumbs`, que no entra en el backup porque se regenera sola.
+- **Visor 3D:** `.glb`, `.gltf`, `.fbx`, `.obj` y `.stl`, en la ficha del archivo. Por encima de 200 MB pide confirmación antes de cargarlo.
 
 ## Copias de seguridad
 

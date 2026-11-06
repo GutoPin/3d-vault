@@ -195,6 +195,8 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Post("/assets/{id}/unlock", s.webUnlock)
 		r.Post("/assets/{id}/restore/{n}", s.webRestore)
 		r.Get("/versions/{id}/download", s.streamVersion)
+		r.Get("/versions/{id}/thumb", s.webThumb)
+		r.Get("/versions/{id}/image", s.webImage)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.requireAdmin)
@@ -210,7 +212,11 @@ func (s *Server) webRoutes(r chi.Router) {
 func (s *Server) requireWebUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := currentUser(r); !ok {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			target := "/login"
+			if r.Method == http.MethodGet && r.URL.Path != "/" {
+				target += "?next=" + url.QueryEscape(r.URL.RequestURI())
+			}
+			http.Redirect(w, r, target, http.StatusSeeOther)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -278,7 +284,15 @@ func (s *Server) webLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSessionCookie(w, user)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, localPath(r.URL.Query().Get("next")), http.StatusSeeOther)
+}
+
+// localPath acepta solo rutas de este sitio, para que next no lleve a otro.
+func localPath(next string) string {
+	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.ContainsAny(next, "\\\r\n") {
+		return "/"
+	}
+	return next
 }
 
 func (s *Server) webLogout(w http.ResponseWriter, r *http.Request) {
@@ -500,6 +514,7 @@ type assetData struct {
 	HistoryNote string
 	CanRelease  bool
 	CanForce    bool
+	Preview     *preview
 }
 
 func (s *Server) webAsset(w http.ResponseWriter, r *http.Request) {
@@ -537,6 +552,7 @@ func (s *Server) renderAsset(w http.ResponseWriter, r *http.Request, status int,
 		HistoryNote: historyNote(versions, asset.HeadVersion),
 		CanRelease:  asset.Lock != nil && asset.Lock.UserID == user.ID,
 		CanForce:    asset.Lock != nil && asset.Lock.UserID != user.ID && user.IsAdmin,
+		Preview:     s.assetPreview(r.Context(), asset),
 	}
 	s.render(w, r, status, "asset", pageData{Title: data.FileName, ActiveProject: asset.ProjectID, Error: errorMessage, Data: data})
 }

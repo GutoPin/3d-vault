@@ -100,7 +100,7 @@ El agente Go (`internal/agent`, sin tests ni interfaz) queda en pausa, no se bor
 
 Velocidad del análisis en JavaScript (Node, esta laptop): corte 321 MiB/s, SHA-256 244 MiB/s, análisis completo 143 MiB/s, unos 15 s para un `.blend` de 2 GB.
 
-**Sin probar:** Edge en Windows con una carpeta real (el selector no se puede automatizar), archivos de varios GB en el navegador y la pantalla en un teléfono, que no tiene la API.
+**Sin probar:** arrastrar y soltar con un ratón de verdad (la copia que hace sí tiene prueba), instalar como aplicación y abrirla al iniciar sesión, los avisos de escritorio, Edge en Windows con una carpeta real (el selector no se puede automatizar), archivos de varios GB en el navegador y la pantalla en un teléfono, que no tiene la API.
 
 ## Web
 
@@ -149,6 +149,19 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | Un manifiesto solo se borra si ninguna versión lo usa | Protege a las versiones restauradas, que comparten el de su origen |
 | `gc` borra primero las filas y después los archivos | Si se corta, quedan archivos sin fila, inofensivos, que recoge el siguiente `gc` |
 | `purge` y `gc` solo con el servidor detenido | Una subida en curso tiene trozos que aún no referencia ningún manifiesto |
+| Mi carpeta se puede instalar como aplicación (manifiesto, sin service worker) y Edge la abre al iniciar sesión | Es lo más parecido al agente de bandeja sin instalar un `.exe`. `launch_handler: focus-existing` evita una segunda ventana, que chocaría con el candado de pestaña |
+| Arrastrar y soltar copia a la carpeta del proyecto y luego sube con un solo comentario | Usa `getAsFileSystemHandle`, que conserva las carpetas. Si el destino existe, pregunta antes de reemplazar |
+| Subir todo usa un comentario para todos los archivos y los sube de uno en uno | Más simple de seguir y de reintentar que en paralelo |
+| Avisos de escritorio solo con la ventana en segundo plano | Con la página a la vista ya se ve en la actividad |
+| `syncAll` es una cola: cada llamada espera una pasada que empezó después | Quien acaba de copiar archivos (soltar) necesita verlos en la siguiente pasada |
+| Al entrar, `?next=` devuelve a la página pedida; solo rutas de este sitio | La app abre `/sync` y, si la sesión venció, debe volver ahí. `localPath` rechaza `//` y `\\` para no redirigir a otro sitio |
+| `SESSION_HOURS=168` en `.env.example` | Quien abre la app al iniciar Windows no debería escribir la contraseña cada día. Sigue siendo configurable |
+| Miniaturas en caché por SHA-256 del contenido, en `DATA_DIR/thumbs`, fuera del backup | Restaurar o repetir contenido no regenera nada, y se reconstruyen solas |
+| El parser de `.blend` lee como máximo 8 MiB y se rinde en GLOB, DNA1 o ENDB. Soporta zstd, gzip, cabecera antigua y la de Blender 5.0 (`LargeBHead8`, del código de Blender) | La miniatura va al principio del archivo |
+| Una miniatura a la vez, en segundo plano al subir, y bajo demanda si falta | No compite con las subidas |
+| Imágenes inline solo PNG, JPEG y WebP. SVG nunca | Un SVG puede llevar scripts |
+| three 0.170.0 incluido en el binario, con los `from 'three'` reescritos a rutas relativas | Sin CDN y sin relajar la CSP para scripts. La CSP solo añade `data:` y `blob:` en imágenes y conexiones, que necesitan los cargadores de `.glb` y `.fbx` |
+| Sin miniatura en la lista del proyecto | Probada: descuadraba los nombres y a 32 px no se distinguía |
 
 ## Cambios a la especificación
 

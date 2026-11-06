@@ -26,6 +26,7 @@ import (
 	"3d-vault/internal/maintenance"
 	"3d-vault/internal/server"
 	"3d-vault/internal/store"
+	"3d-vault/internal/thumbs"
 	"3d-vault/internal/vault"
 )
 
@@ -195,6 +196,10 @@ func openData(ctx context.Context, dir string) (*db.DB, *store.Store, error) {
 
 const shutdownTimeout = 30 * time.Second
 
+// thumbsDir guarda las miniaturas dentro de DATA_DIR. Es una caché: no va en los
+// backups y se regenera al pedirlas.
+const thumbsDir = "thumbs"
+
 func serve(ctx context.Context) error {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -219,13 +224,20 @@ func serve(ctx context.Context) error {
 		return err
 	}
 
+	thumbCache, err := thumbs.NewCache(filepath.Join(cfg.dataDir, thumbsDir))
+	if err != nil {
+		return err
+	}
 	svc := vault.New(vault.Config{
 		DB:          database,
 		Store:       chunks,
 		Hub:         events.NewHub(),
 		MaxFileSize: cfg.maxFileSize,
 		Argon:       auth.DefaultParams,
+		Thumbs:      thumbCache,
 	})
+	// Antes de cerrar el almacén: las miniaturas en curso leen trozos.
+	defer svc.WaitBackground()
 
 	hasAdmin, err := svc.HasAdmin(ctx)
 	if err != nil {

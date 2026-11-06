@@ -29,6 +29,31 @@
   <div class="fact"><div class="label">Última subida</div><div class="value">{{$asset.UploadedBy}}</div><div class="note">{{when $asset.UpdatedAt}}</div></div>
 </section>
 
+{{with .Data.Preview}}
+<div class="ledger-head"><h2>Vista previa</h2>{{if eq .Kind "model"}}<p>Arrastra para girar, usa la rueda para acercar.</p>{{end}}</div>
+<div class="panel preview preview-{{.Kind}}">
+  {{if eq .Kind "blend"}}
+    {{if .Thumb}}<img class="preview-thumb" src="/versions/{{.VersionID}}/thumb" alt="Miniatura guardada por Blender" width="128" height="128">
+    {{else}}<div class="preview-none">{{template "brand"}}<p>Este .blend no tiene miniatura. Blender la guarda al activar «Save Preview Images».</p></div>{{end}}
+  {{else if eq .Kind "image"}}
+    <img class="preview-image" src="/versions/{{.VersionID}}/image" alt="{{$.Data.FileName}}">
+  {{else}}
+    <div class="viewer" id="viewer" data-src="/versions/{{.VersionID}}/download" data-ext="{{.Ext}}">
+      <canvas aria-label="Modelo 3D de {{$.Data.FileName}}"></canvas>
+      {{if .Large}}<div class="viewer-large" data-large>
+        <p>Este archivo ocupa {{formatBytes .Size}}. Cargarlo en el navegador puede tardar y usar mucha memoria.</p>
+        <button class="btn" type="button" data-load>Cargar de todos modos</button>
+      </div>{{end}}
+      <div class="viewer-bar">
+        <p class="viewer-note" data-note role="status"></p>
+        <button class="btn" type="button" data-fit hidden>Encuadrar</button>
+      </div>
+    </div>
+    <script type="module" src="/static/viewer.js"></script>
+  {{end}}
+</div>
+{{end}}
+
 <div class="ledger-head">
   <h2>Historial</h2>
   <p>{{.Data.HistoryNote}}</p>

@@ -28,6 +28,7 @@ import (
 	"3d-vault/internal/manifest"
 	"3d-vault/internal/rules"
 	"3d-vault/internal/store"
+	"3d-vault/internal/thumbs"
 	"3d-vault/internal/vault"
 )
 
@@ -64,10 +65,17 @@ func newEnv(t *testing.T, options ...envOption) *env {
 	}
 	t.Cleanup(func() { _ = chunks.Close() })
 
+	thumbCache, err := thumbs.NewCache(filepath.Join(dir, "thumbs"))
+	if err != nil {
+		t.Fatalf("thumbs.NewCache: %v", err)
+	}
+
 	svc := vault.New(vault.Config{
 		DB: database, Store: chunks, Hub: events.NewHub(),
 		MaxFileSize: 1 << 30, Argon: auth.Params{Memory: 1024, Time: 1, Threads: 1},
+		Thumbs: thumbCache,
 	})
+	t.Cleanup(svc.WaitBackground)
 
 	cfg := Config{
 		Service:         svc,
@@ -895,7 +903,7 @@ func TestWebRequiresLogin(t *testing.T) {
 	b := e.newBrowser()
 	for _, path := range []string{"/", "/sync", "/projects/1", "/assets/1", "/admin/users", "/versions/1/download"} {
 		resp, _ := b.get(path)
-		if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
+		if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(resp.Header.Get("Location"), "/login") {
 			t.Errorf("%s = %d, %s", path, resp.StatusCode, resp.Header.Get("Location"))
 		}
 	}
@@ -1269,6 +1277,24 @@ func TestFormatters(t *testing.T) {
 	} {
 		if got := formatWhen(tt.t, now); got != tt.want {
 			t.Errorf("formatWhen = %q, quiero %q", got, tt.want)
+		}
+	}
+}
+
+func TestLocalPathOnlyAllowsThisSite(t *testing.T) {
+	t.Parallel()
+
+	for next, want := range map[string]string{
+		"/sync":                "/sync",
+		"/assets/3?x=1":        "/assets/3?x=1",
+		"":                     "/",
+		"https://malo.example": "/",
+		"//malo.example":       "/",
+		"/\\malo.example":      "/",
+		"sync":                 "/",
+	} {
+		if got := localPath(next); got != want {
+			t.Errorf("localPath(%q) = %q, quiero %q", next, got, want)
 		}
 	}
 }

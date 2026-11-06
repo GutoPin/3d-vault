@@ -137,7 +137,7 @@ GET  /api/versions/{id}/download          → archivo completo reconstruido en s
 
 > **Cambio de plan (2026-11-06).** El agente `.exe` con ícono en la bandeja se reemplaza por la página **Mi carpeta** de la web. Un `.exe` sin firmar lo bloquean SmartScreen, Smart App Control o Defender, y firmarlo cuesta dinero y días de validación. El navegador (Edge viene con Windows) puede leer y escribir una carpeta elegida por el usuario. El protocolo, los trozos y las reglas de esta sección no cambian; lo que no aplica en el navegador se indica abajo. El código del agente Go queda en `internal/agent`, en pausa. Detalle en `docs/DECISIONES.md`.
 >
-> **No aplica en el navegador:** ícono de bandeja e inicio con Windows (la sincronización automática funciona con la pestaña abierta), atributo de solo lectura, `fsnotify` (se revisa al volver a la pestaña y cada minuto), API local en 127.0.0.1 y caché de trozos (se reutilizan los de la versión local). El estado va en IndexedDB y la carpeta elegida se recuerda, con un permiso que el navegador vuelve a pedir.
+> **No aplica en el navegador:** ícono de bandeja (en su lugar, la página se instala como aplicación y Edge la abre al iniciar sesión; la sincronización automática funciona con su ventana abierta), atributo de solo lectura, `fsnotify` (se revisa al volver a la pestaña y cada minuto), API local en 127.0.0.1 y caché de trozos (se reutilizan los de la versión local). El estado va en IndexedDB y la carpeta elegida se recuerda, con un permiso que el navegador vuelve a pedir.
 
 ### Diseño original del agente (referencia)
 

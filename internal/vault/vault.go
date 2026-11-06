@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"3d-vault/internal/auth"
@@ -18,6 +19,7 @@ import (
 	"3d-vault/internal/events"
 	"3d-vault/internal/rules"
 	"3d-vault/internal/store"
+	"3d-vault/internal/thumbs"
 )
 
 // Config configura un Service.
@@ -27,6 +29,8 @@ type Config struct {
 	Hub         *events.Hub
 	MaxFileSize int64
 	Argon       auth.Params
+	// Thumbs guarda las miniaturas de los .blend. Sin él, no se generan.
+	Thumbs *thumbs.Cache
 	// Now permite fijar el reloj en tests. Por defecto, time.Now.
 	Now func() time.Time
 }
@@ -39,6 +43,10 @@ type Service struct {
 	maxFileSize int64
 	argon       auth.Params
 	now         func() time.Time
+	thumbs      *thumbs.Cache
+	// thumbSem limita a una las miniaturas que se generan a la vez.
+	thumbSem   chan struct{}
+	background sync.WaitGroup
 	// afterVerify se llama tras verificar un manifiesto, antes de la transacción
 	// final. Solo lo usan los tests, para simular cambios durante la verificación.
 	afterVerify func()
@@ -57,6 +65,8 @@ func New(cfg Config) *Service {
 		maxFileSize: cfg.MaxFileSize,
 		argon:       cfg.Argon,
 		now:         now,
+		thumbs:      cfg.Thumbs,
+		thumbSem:    make(chan struct{}, 1),
 	}
 }
 

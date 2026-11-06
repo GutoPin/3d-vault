@@ -127,7 +127,8 @@ try {
   const n2 = await upload(a, 'modelos/camion.blend', 'Cambio en medio');
   assert.match(n2, /Subido como v2/);
   const reused = Number(/reutilizó el (\d+)/.exec(n2)[1]);
-  assert.ok(reused >= 70, `reutilizado ${reused}`);
+  // Un cambio de 64 KiB toca uno o dos trozos de hasta 4 MiB en un archivo de 12 MiB.
+  assert.ok(reused >= 50, `reutilizado ${reused}`);
   step(`PC A sube v2: ${n2.trim()}`);
 
   await b.waitForFunction(() => window.row('modelos/camion.blend')?.asset.head_version === 2 && window.row('modelos/camion.blend').status === 'ok', null, { timeout: 60000 });
@@ -183,6 +184,34 @@ try {
   await waitRow(b, 'modelos/camion.blend', 'ok');
   assert.equal(chunkGets.length, before);
   step('Al recargar la página el estado se conserva sin descargar de nuevo');
+
+  // Subir todo: dos archivos nuevos con un solo comentario. B los recibe.
+  await a.evaluate(async () => {
+    await writeFile('texturas/chapa.png', crypto.getRandomValues(new Uint8Array(40000)));
+    await writeFile('modelos/pala.blend', crypto.getRandomValues(new Uint8Array(60000)));
+  });
+  await a.click('[data-action=sync-now]');
+  await waitRow(a, 'modelos/pala.blend', 'new');
+  await a.click('button[data-action=upload-all]');
+  await a.fill('#upload-comment', 'Agrego pala y textura');
+  await a.click('#upload-dialog button[value=ok]');
+  await a.waitForFunction(() => /Listo: 2 archivo/.test(document.getElementById('sync-notice').textContent), null, { timeout: 30000 });
+  await b.waitForFunction(() => window.row('texturas/chapa.png')?.status === 'ok' && window.row('modelos/pala.blend')?.status === 'ok', null, { timeout: 60000 });
+  step('Subir todo agrega dos archivos con un comentario y B los recibe');
+
+  // Lo que hace soltar una carpeta: copiarla con su estructura e ignorar respaldos.
+  const copied = await a.evaluate(async () => {
+    const src = await (await navigator.storage.getDirectory()).getDirectoryHandle('fuera', { create: true });
+    const sub = await src.getDirectoryHandle('ruedas', { create: true });
+    for (const [d, n] of [[sub, 'rueda.blend'], [sub, 'rueda.blend1'], [src, 'nota.txt']]) {
+      const w = await (await d.getFileHandle(n, { create: true })).createWritable(); await w.write('x'); await w.close();
+    }
+    const keys = new Set();
+    await window.__3dvault.copyIn(window.__3dvault.ui.engines.get(1).root, src, '', keys);
+    return [...keys].sort();
+  });
+  assert.deepEqual(copied, ['fuera/nota.txt', 'fuera/ruedas/rueda.blend']);
+  step(`Soltar una carpeta copia su estructura sin respaldos: ${copied.join(', ')}`);
 
   assert.deepEqual(errors.filter((e) => !/409|423|Failed to load resource/.test(e)), []);
   console.log('\nTodo bien.');

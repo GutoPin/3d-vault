@@ -19,6 +19,15 @@ Dentro de tu carpeta aparece una carpeta por proyecto, con todos sus archivos.
 
 **Consejo:** guarda la página en favoritos. Cada vez que la abras, el navegador te pedirá permiso para usar la carpeta: pulsa **Permitir y sincronizar**. Si te ofrece **Permitir siempre**, elígelo.
 
+## Que se sincronice solo desde que enciendes la PC (recomendado)
+
+1. En Mi carpeta, baja hasta **Comodidades** y pulsa **Instalar**. Si no aparece el botón: menú **⋯** de Edge → **Aplicaciones** → **Instalar este sitio como aplicación**.
+2. 3D-Vault se abre en su propia ventana, con ícono en la barra de tareas y en el menú Inicio.
+3. Escribe `edge://apps` en la barra de direcciones de Edge, haz clic derecho sobre 3D-Vault y marca **Iniciar automáticamente al iniciar sesión**.
+4. En **Comodidades**, pulsa **Activar avisos**. Windows te avisará cuando un compañero suba una versión nueva, aunque estés en Blender.
+
+Desde entonces, al encender la PC 3D-Vault se abre solo. Puedes minimizar la ventana y olvidarte. Si la sesión venció, te pedirá tu contraseña y volverá a Mi carpeta.
+
 ## Mientras trabajas
 
 **Deja abierta la pestaña de Mi carpeta.** Mientras está abierta, cuando un compañero sube una versión nueva, tu copia se actualiza sola en unos segundos. Si la cierras, no pasa nada: al volver a abrirla se pone al día.
@@ -49,7 +58,13 @@ Puedes subir varias versiones seguidas sin liberar: desmarca la casilla y libér
 
 ## Agregar archivos nuevos
 
-Copia o guarda el archivo dentro de la carpeta del proyecto, en la subcarpeta que quieras. En Mi carpeta aparece como **Nuevo, sin subir**. Pulsa **Agregar…**, escribe un comentario y listo: desde ese momento lo tienen todos.
+La forma más rápida: **arrastra los archivos o carpetas** desde el Explorador de Windows y suéltalos sobre la tabla del proyecto. Se copian a la carpeta del proyecto, con sus subcarpetas, y te pide un solo comentario para subirlos todos.
+
+También puedes copiar o guardar el archivo dentro de la carpeta del proyecto. En Mi carpeta aparece como **Nuevo, sin subir**. Pulsa **Agregar…**, escribe un comentario y listo: desde ese momento lo tienen todos.
+
+Si tienes varios archivos nuevos o cambiados, el botón **Subir todo** junto al nombre del proyecto los sube de una vez con el mismo comentario.
+
+El número entre paréntesis en la pestaña del navegador, por ejemplo **(2) Mi carpeta**, son los archivos que esperan que los subas.
 
 Los archivos de respaldo de Blender (`.blend1`, `.blend2`…) y los temporales se ignoran solos.
 
@@ -61,7 +76,7 @@ Para evitarlo: **bloquea siempre antes de editar**.
 
 ## Ver versiones anteriores
 
-Pulsa el nombre de un archivo para abrir su ficha. Ahí está el historial con quién subió cada versión, cuándo, su comentario y cuánto cambió. Puedes **Descargar** cualquier versión o **Restaurarla**, lo que crea una versión nueva igual a la antigua, sin borrar nada.
+Pulsa el nombre de un archivo para abrir su ficha. Ahí ves la miniatura de los `.blend` (si se guardaron con vista previa), las imágenes, y los `.glb`, `.gltf`, `.fbx`, `.obj` y `.stl` en 3D: arrastra para girar, rueda para acercar y **Encuadrar** para volver a la vista inicial. También está el historial con quién subió cada versión, cuándo, su comentario y cuánto cambió. Puedes **Descargar** cualquier versión o **Restaurarla**, lo que crea una versión nueva igual a la antigua, sin borrar nada.
 
 ## Preguntas frecuentes
 

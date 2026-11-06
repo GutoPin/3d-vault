@@ -65,6 +65,27 @@
   </div>
   <div class="panel"><ol class="sync-log" id="sync-log"><li class="free">Nada todavía.</li></ol></div>
 
+  <section class="settings-row">
+    <div>
+      <h2>Comodidades</h2>
+      <p>Para no tener que acordarte de abrir esta página.</p>
+    </div>
+    <div class="panel comforts">
+      <div class="comfort"><div>
+        <b>Instalar como aplicación</b>
+        <p class="sub">Tendrá su propia ventana e ícono en la barra de tareas. Después, en Edge abre <b>edge://apps</b>, haz clic derecho sobre 3D-Vault y marca <b>Iniciar automáticamente al iniciar sesión</b>: así se sincroniza desde que enciendes la PC.</p>
+        <p class="sub" id="install-how">Si no ves el botón: menú <b>⋯</b> del navegador → <b>Aplicaciones</b> → <b>Instalar este sitio como aplicación</b>.</p>
+        <p class="sub" id="install-done" hidden>Ya la estás usando como aplicación.</p>
+      </div>
+      <button class="btn" type="button" data-action="install" id="install-btn" hidden>Instalar</button></div>
+      <div class="comfort"><div>
+        <b>Avisos de escritorio</b>
+        <p class="sub">Te avisa cuando llega una versión nueva o hay un conflicto, aunque estés en Blender. <span id="notify-state"></span></p>
+      </div>
+      <button class="btn" type="button" data-action="notify" id="notify-btn" hidden>Activar avisos</button></div>
+    </div>
+  </section>
+
   <details class="settings-row inline-form">
     <summary class="text-action">Ajustes de esta PC</summary>
     <form class="panel form-grid" id="client-form">

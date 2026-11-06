@@ -4,7 +4,7 @@
     <div class="brand">{{template "brand"}}3D-Vault</div>
     <h1>Entrar</h1>
     {{if .Error}}<p class="notice" role="alert">{{.Error}}</p>{{end}}
-    <form method="post" action="/login">
+    <form method="post">
       <div class="field">
         <label for="username">Usuario</label>
         <input class="input" id="username" name="username" autocomplete="username" autocapitalize="none" required autofocus value="{{.Data.Username}}">

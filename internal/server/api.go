@@ -803,11 +803,17 @@ func (s *Server) streamVersion(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, r, err)
 		return
 	}
+	s.sendVersion(w, r, file, "application/octet-stream", "attachment")
+}
 
+// sendVersion reconstruye la versión en streaming. contentType y disposition los
+// elige el servidor, nunca quien hace la petición.
+func (s *Server) sendVersion(w http.ResponseWriter, r *http.Request, file vault.VersionFile, contentType, disposition string) {
+	id := file.Version.ID
 	h := w.Header()
-	h.Set("Content-Type", "application/octet-stream")
+	h.Set("Content-Type", contentType)
 	h.Set("Content-Length", strconv.FormatInt(file.Version.SizeBytes, 10))
-	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(file.Path)}))
+	h.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": path.Base(file.Path)}))
 	h.Set("ETag", `"`+file.Version.FileSHA256+`"`)
 
 	rc := http.NewResponseController(w)
