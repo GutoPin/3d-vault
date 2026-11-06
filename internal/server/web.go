@@ -189,11 +189,13 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Get("/", s.webProjects)
 		r.Get("/sync", s.webSync)
 		r.Get("/blender/3dvault.zip", s.blenderAddon)
+		r.Get("/blender/version", s.blenderVersion)
 		r.Post("/projects", s.webCreateProject)
 		r.Get("/projects/{id}", s.webProject)
 		r.Get("/assets/{id}", s.webAsset)
 		r.Post("/assets/{id}/lock", s.webLock)
 		r.Post("/assets/{id}/unlock", s.webUnlock)
+		r.Post("/assets/{id}/request-unlock", s.webRequestUnlock)
 		r.Post("/assets/{id}/restore/{n}", s.webRestore)
 		r.Get("/versions/{id}/download", s.streamVersion)
 		r.Get("/versions/{id}/thumb", s.webThumb)
@@ -516,6 +518,8 @@ type assetData struct {
 	CanRelease  bool
 	CanForce    bool
 	Preview     *preview
+	// Requested confirma que se pidió liberar el archivo.
+	Requested bool
 }
 
 func (s *Server) webAsset(w http.ResponseWriter, r *http.Request) {
@@ -546,6 +550,7 @@ func (s *Server) renderAsset(w http.ResponseWriter, r *http.Request, status int,
 
 	user, _ := currentUser(r)
 	data := assetData{
+		Requested:   r.URL.Query().Get("pedido") == "1",
 		Project:     project,
 		Asset:       asset,
 		FileName:    path.Base(asset.Path),

@@ -40,7 +40,7 @@ En la tabla de cada proyecto ves el estado de cada archivo:
 |---|---|---|
 | Al día | Tienes la última versión | Nada |
 | Bloqueado por ti | Lo estás editando tú | Trabaja en él y súbelo |
-| Bloqueado por Juan | Lo está editando Juan | Ábrelo para mirar, pero no lo edites |
+| Bloqueado por Juan | Lo está editando Juan | Ábrelo para mirar, pero no lo edites. Si lo necesitas, **Pedir que lo libere**: a Juan le llega un aviso |
 | Cambios sin subir | Lo guardaste y el servidor aún no lo tiene | **Subir…** |
 | Nuevo, sin subir | Es un archivo que solo está en tu PC | **Agregar…** si es del proyecto |
 | No está en tu carpeta | Lo borraste o lo moviste | **Descargar** para recuperarlo |
@@ -75,6 +75,10 @@ Después, en la vista 3D pulsa **N** y abre la pestaña **3D-Vault**. Con un arc
 - **Guardar y subir**: guarda, te pide el comentario y sube solo lo que cambió.
 - **Actualizar a v5**: baja la versión nueva y la abre. Si tenías cambios que el servidor no tiene, primero guarda tu copia como `*.conflicto-*`.
 - **Ver historial**: abre la ficha del archivo en la web.
+- **Pedir que lo libere**, si lo tiene otra persona.
+- **Versiones** (despliégalo): todas las versiones con su autor, fecha y comentario. El botón de ventana de cada una la **abre aparte**, en otra ventana de Blender, para compararla con la tuya sin tocar tu archivo.
+
+Si el complemento se queda viejo, el panel lo avisa con un botón para bajar el nuevo: instálalo igual que la primera vez.
 
 Además te avisa **al abrir** un archivo si hay una versión más nueva o si lo tiene otra persona, y **al guardar** si lo estás editando sin bloquearlo.
 
@@ -91,6 +95,10 @@ También puedes copiar o guardar el archivo dentro de la carpeta del proyecto. E
 ¿Estás en otra PC o sin Mi carpeta? En la página del proyecto, **Agregar archivos** sube desde cualquier navegador, y en la ficha de un archivo, **Subir nueva versión**.
 
 Si tienes varios archivos nuevos o cambiados, el botón **Subir todo** junto al nombre del proyecto los sube de una vez con el mismo comentario.
+
+En proyectos grandes, el buscador de arriba filtra por nombre y **Solo lo que necesita algo de mí** deja solo lo pendiente.
+
+Si tienes un archivo bloqueado desde hace más de un día, Mi carpeta te lo recuerda: libéralo si ya no lo estás editando.
 
 El número entre paréntesis en la pestaña del navegador, por ejemplo **(2) Mi carpeta**, son los archivos que esperan que los subas.
 

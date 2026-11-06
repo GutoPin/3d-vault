@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "three_d_vault"
-version = "1.0.0"
+version = "1.1.0"
 name = "3D-Vault"
 tagline = "Bloquea, sube y actualiza archivos de 3D-Vault desde Blender"
 maintainer = "Equipo 3D-Vault"

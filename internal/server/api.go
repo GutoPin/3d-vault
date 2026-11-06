@@ -61,6 +61,7 @@ func (s *Server) apiRoutes(r chi.Router) {
 			r.Post("/assets/{id}/versions", s.apiCommitVersion)
 			r.Post("/assets/{id}/lock", s.apiLock)
 			r.Delete("/assets/{id}/lock", s.apiUnlock)
+			r.Post("/assets/{id}/request-unlock", s.apiRequestUnlock)
 			r.Post("/assets/{id}/restore/{n}", s.apiRestore)
 			r.Post("/assets/{id}/move", s.apiMove)
 			r.Delete("/assets/{id}", s.apiDelete)

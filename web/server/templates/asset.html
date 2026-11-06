@@ -14,10 +14,14 @@
     {{else if not $asset.Lock}}
     <form method="post" action="/assets/{{$asset.ID}}/lock"><button class="btn" type="submit">Bloquear</button></form>
     {{end}}
+    {{if and $asset.Lock (ne $asset.Lock.UserID $.User.ID)}}
+    <form method="post" action="/assets/{{$asset.ID}}/request-unlock"><button class="btn" type="submit" title="Le llega un aviso a {{$asset.Lock.DisplayName}}">Pedir que lo libere</button></form>
+    {{end}}
     <a class="btn primary" href="/versions/{{$asset.HeadVersionID}}/download">Descargar v{{$asset.HeadVersion}}</a>
   </div>
 </div>
 
+{{if .Data.Requested}}<p class="notice ok" role="status">Listo: {{with $asset.Lock}}{{.DisplayName}}{{end}} recibirá un aviso en Mi carpeta de que necesitas este archivo.</p>{{end}}
 <section class="facts" aria-label="Estado del archivo">
   <div class="fact"><div class="label">Última versión</div><div class="value lead">v{{$asset.HeadVersion}}</div></div>
   <div class="fact"><div class="label">Tamaño</div><div class="value">{{formatBytes $asset.SizeBytes}}</div></div>

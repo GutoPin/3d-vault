@@ -65,6 +65,7 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | PC B: **Subir…** | Error: "Bloqueado por … desde …". No se crea versión |
 | PC A sube una versión nueva (paso 3 con otro archivo) | En B: el archivo de B queda como `camion.conflicto-ana-AAAAMMDD-HHMM.blend` junto al original, que pasa a la versión de A. No se pierde nada |
 | PC B: **Liberar** en un archivo bloqueado por A | No aparece el botón: solo A puede liberar. El admin puede **Forzar desbloqueo** en la ficha |
+| PC B: **Pedir que lo libere** | En A, al momento: "Ana necesita …" y aviso de escritorio aunque esté a la vista. Repetirlo antes de 5 minutos da error |
 
 ## 5. Renombrar, borrar, recuperar
 
@@ -82,6 +83,7 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 |---|---|
 | Copiar a la carpeta 2 o 3 archivos nuevos y pulsar **Subir todo (N)** | Un solo comentario para todos |
 | **Pausar** y copiar un archivo nuevo | No cambia nada hasta **Reanudar** |
+| Escribir en el buscador o marcar **Solo lo que necesita algo de mí** | La tabla se filtra |
 | Cerrar la pestaña y volver a abrir `/sync` | Pide **Permitir y sincronizar**. Al aceptar, el estado sigue igual y no se vuelve a bajar nada |
 | **Instalar** (o menú ⋯ → Aplicaciones → Instalar) | Se abre en su ventana. En `edge://apps`, clic derecho → Iniciar automáticamente al iniciar sesión |
 | **Activar avisos**, minimizar la ventana y subir una versión desde la otra PC | Aviso de Windows: "… actualizado a vN por …" |
@@ -102,6 +104,8 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | Guardar (Ctrl+S) sin tener el bloqueo | Aviso: "guardaste sin bloquear" |
 | Con una versión más nueva en el servidor: **Actualizar a vN** | Baja la versión y la abre. Si tenías cambios propios, antes guarda la copia `*.conflicto-*` |
 | Archivo comprimido (ábrelo desde `para-versiones` copiado al proyecto) | Sugiere **Guardar sin comprimir** |
+| Desplegar **Versiones** y pulsar el botón de ventana de una anterior | Se abre otra ventana de Blender con esa versión; tu archivo no cambia |
+| Con el archivo bloqueado por otro: **Pedir que lo libere** | Le llega el aviso en su Mi carpeta |
 
 ## 8. Administración
 

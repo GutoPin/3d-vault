@@ -3,6 +3,8 @@ import { Api, ApiError, Project, ignored, keyOf } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTO_EVERY = 60_000;
+const STALE_LOCK = 24 * 3600_000;
+const NEEDS_ME = new Set(['changed', 'new', 'moved', 'missing', 'error']);
 const EVENT_KINDS = ['asset_created', 'version_created', 'locked', 'unlocked', 'moved', 'deleted'];
 
 const STATUS = {
@@ -171,6 +173,7 @@ function rowActions(pid, row) {
     if (row.lockedByMe) out.push(actionButton('Liberar', 'unlock', pid, row.key));
     else if (lock && lock.user_id === ui.me.id) out.push(actionButton('Traer el bloqueo a esta PC', 'takeover', pid, row.key));
     else if (!lock) out.push(actionButton('Bloquear', 'lock', pid, row.key));
+    else out.push(actionButton('Pedir que lo libere', 'request', pid, row.key));
   }
   return out;
 }
@@ -203,9 +206,12 @@ function render() {
   let pending = 0;
   for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
     const engine = ui.engines.get(p.id);
-    const rows = engine?.rows ?? [];
-    const toUpload = rows.filter((r) => r.status === 'changed' || r.status === 'new').length;
-    pending += toUpload + rows.filter((r) => r.status === 'error').length;
+    const all = engine?.rows ?? [];
+    const query = $('filter').value.trim().toLowerCase();
+    const onlyPending = $('only-pending').checked;
+    const rows = all.filter((r) => (!query || r.key.includes(query)) && (!onlyPending || NEEDS_ME.has(r.status)));
+    const toUpload = all.filter((r) => r.status === 'changed' || r.status === 'new').length;
+    pending += toUpload + all.filter((r) => r.status === 'error' || r.status === 'moved').length;
     const body = rows.map((row) => el('tr', {},
       el('td', {}, row.asset ? el('a', { class: 'name', href: `/assets/${row.asset.id}` }, row.asset.path) : el('span', { class: 'name' }, row.local.path)),
       el('td', { class: 'n' }, row.asset ? `v${row.asset.head_version}` : '—'),
@@ -220,7 +226,9 @@ function render() {
         ? el('div', { class: 'table-wrap' }, el('table', { class: 'stack-table' },
             el('thead', {}, el('tr', {}, el('th', {}, 'Archivo'), el('th', { class: 'n' }, 'Versión'), el('th', { class: 'n' }, 'Tamaño'), el('th', {}, 'Estado'), el('th', {}, ''))),
             el('tbody', {}, ...body)))
-        : el('p', { class: 'empty' }, engine ? 'Este proyecto todavía no tiene archivos. Arrástralos aquí o cópialos en su carpeta.' : 'Sincronizando…'),
+        : el('p', { class: 'empty' }, !engine ? 'Sincronizando…'
+          : all.length ? 'Ningún archivo coincide con el filtro.'
+          : 'Este proyecto todavía no tiene archivos. Arrástralos aquí o cópialos en su carpeta.'),
         engine && rows.length > 0 && el('p', { class: 'drop-hint' }, 'Arrastra aquí archivos o carpetas para agregarlos al proyecto.')),
     );
   }
@@ -228,6 +236,14 @@ function render() {
   const state = ui.paused ? 'Sincronización en pausa.' : ui.running ? 'Sincronizando…' : 'Sincronización automática activa.';
   $('sync-summary').textContent = pending ? `${state} ${pending} archivo(s) esperan que hagas algo.` : state;
   document.title = `${pending ? `(${pending}) ` : ''}Mi carpeta · 3D-Vault`;
+
+  // Bloqueos propios de más de un día: un olvido frecuente que frena a los demás.
+  const old = [...ui.engines.values()].flatMap((e) => e.rows)
+    .filter((r) => r.lockedByMe && Date.now() - Date.parse(r.asset.lock.locked_at) > STALE_LOCK);
+  $('stale-locks').hidden = !old.length;
+  $('stale-locks').textContent = old.length
+    ? `Tienes ${old.length === 1 ? 'un archivo bloqueado' : `${old.length} archivos bloqueados`} desde hace más de un día: ${old.map((r) => r.asset.path).join(', ')}. Si ya no los estás editando, súbelos o libéralos para que otros puedan trabajar.`
+    : '';
   $('pause-btn').textContent = ui.paused ? 'Reanudar' : 'Pausar';
 }
 
@@ -323,6 +339,14 @@ function openStream() {
   if (!ui.selected.size) return;
   const stream = new EventSource(`/api/stream?projects=${[...ui.selected].join(',')}`);
   for (const kind of [...EVENT_KINDS, 'reset']) stream.addEventListener(kind, () => syncAll());
+  stream.addEventListener('unlock_requested', (e) => {
+    const { payload } = JSON.parse(e.data);
+    if (payload.lock?.user_id !== ui.me.id) return;
+    const text = `${payload.actor_name} necesita ${payload.path}. Súbelo y libéralo cuando puedas.`;
+    notice(text, true);
+    log(text);
+    notify(text, true);
+  });
   ui.stream = stream;
 }
 
@@ -444,6 +468,10 @@ const actions = {
     await navigator.clipboard.writeText($('blender-code').value).catch(() => $('blender-code').select());
     notice('Código copiado. Pégalo en las preferencias del complemento en Blender.', true);
   },
+  request: (engine, row) => run(async () => {
+    await ui.api.json('POST', `/api/assets/${row.asset.id}/request-unlock`);
+    notice(`Listo: ${row.asset.lock.display_name} recibirá un aviso de que necesitas ${row.asset.path}.`, true);
+  }),
   move: (engine, row) => run(async () => {
     await engine.move(row);
     notice(`Movido en el servidor: ${row.from.asset.path} → ${row.local.path}. Conserva su historial.`, true);
@@ -478,6 +506,10 @@ document.addEventListener('change', (e) => {
   render();
   syncAll();
 });
+
+$('filter').addEventListener('input', () => render());
+$('only-pending').addEventListener('change', () => render());
+$('filter-form').addEventListener('submit', (e) => e.preventDefault());
 
 $('client-form').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -514,8 +546,11 @@ function renderComforts() {
   $('notify-state').textContent = perm === 'granted' ? 'Activados.' : perm === 'denied' ? 'Bloqueados en este navegador.' : '';
 }
 
-function notify(text) {
-  if (!('Notification' in window) || Notification.permission !== 'granted' || document.visibilityState === 'visible') return;
+// notify muestra un aviso de escritorio. Si no es urgente, solo con la ventana
+// en segundo plano: a la vista ya se ve en la página.
+function notify(text, urgent = false) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!urgent && document.visibilityState === 'visible') return;
   new Notification('3D-Vault', { body: text, icon: '/static/app/icon-192.png', tag: text });
 }
 

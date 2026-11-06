@@ -8,6 +8,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import shutil
 import ssl
 import time
@@ -180,6 +181,17 @@ def file_sha256(path):
     return h.hexdigest()
 
 
+def manifest_version(text):
+    """La versión de un blender_manifest.toml."""
+    m = re.search(r'(?m)^version\s*=\s*"([^"]+)"', text)
+    return m.group(1) if m else ""
+
+
+def own_version():
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender_manifest.toml"), encoding="utf-8") as f:
+        return manifest_version(f.read())
+
+
 # ---------- conexión ----------
 
 CODE_PREFIX = "3DV1:"
@@ -328,11 +340,13 @@ class Vault:
         st["locked_by_me"] = bool(lock and lock["user_id"] == me["id"] and lock["client_id"] == self.api.headers["X-Client-Id"])
         st["locked_by_me_elsewhere"] = bool(lock and lock["user_id"] == me["id"] and not st["locked_by_me"])
         sha = self.local_sha(path)
+        versions = self.api.request("GET", f"/api/assets/{asset['id']}/versions")["versions"]
+        st["versions"] = sorted(versions, key=lambda v: -v["number"])
         if sha == asset["file_sha256"]:
             st["state"] = "current"
             st["local_version"] = asset["head_version"]
+            st["local_version_id"] = asset["head_version_id"]
             return st
-        versions = self.api.request("GET", f"/api/assets/{asset['id']}/versions")["versions"]
         older = next((v for v in versions if v["file_sha256"] == sha), None)
         if older:
             st["state"] = "outdated"
@@ -341,6 +355,14 @@ class Vault:
         else:
             st["state"] = "modified"
         return st
+
+    def addon_update(self):
+        """La versión del complemento que entrega el servidor, si es otra."""
+        server = self.api.request("GET", "/blender/version", raw=True).decode().strip()
+        return server if server and server != own_version() else None
+
+    def request_unlock(self, st):
+        return self.api.request("POST", f"/api/assets/{st['asset']['id']}/request-unlock")
 
     def lock(self, st, takeover=False):
         return self.api.request("POST", f"/api/assets/{st['asset']['id']}/lock", {"takeover": takeover})
@@ -411,12 +433,33 @@ class Vault:
             copy = conflict_name(path, self.me()["username"])
             shutil.copy2(path, copy)
 
+        self._write(new, have, path, path, progress)
+        return copy
+
+    def download_version(self, path, st, version, dest, progress=None):
+        """Baja una versión cualquiera a dest, copiando del archivo local los
+        trozos que ya tiene, para abrirla aparte sin tocar el archivo de trabajo."""
+        new = self.api.request("GET", f"/api/versions/{version['id']}/manifest")
+        have = {}
+        if st.get("local_version_id"):
+            old = self.api.request("GET", f"/api/versions/{st['local_version_id']}/manifest")
+            off = 0
+            for c in old["chunks"]:
+                have.setdefault(c["sha256"], off)
+                off += c["size"]
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        self._write(new, have, path, dest, progress)
+        return dest
+
+    def _write(self, new, have, base_path, dest, progress):
+        """Escribe el archivo de un manifiesto en dest, de forma atómica,
+        tomando de base_path los trozos de have y el resto del servidor."""
         total = sum(c["size"] for c in new["chunks"])
-        tmp = path + ".descarga.tmp"
+        tmp = dest + ".descarga.tmp"
         file_hash = hashlib.sha256()
         done = 0
         try:
-            with open(path, "rb") as base, open(tmp, "wb") as out:
+            with open(base_path, "rb") as base, open(tmp, "wb") as out:
                 def get(c):
                     off = have.get(c["sha256"])
                     if off is not None:
@@ -438,8 +481,7 @@ class Vault:
                 os.fsync(out.fileno())
             if file_hash.hexdigest() != new["file_sha256"]:
                 raise VaultError("El archivo descargado no coincide con el del servidor.")
-            os.replace(tmp, path)
+            os.replace(tmp, dest)
         finally:
             if os.path.exists(tmp):
                 os.remove(tmp)
-        return copy

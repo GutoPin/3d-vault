@@ -151,6 +151,17 @@ try {
   assert.match(n3, /Bloqueado por/);
   step(`PC B no puede subir lo bloqueado por A: «${n3.trim()}»`);
 
+  await b.click('button[data-action=request][data-key="modelos/camion.blend"]');
+  await b.waitForFunction(() => /recibirá un aviso/.test(document.getElementById('sync-notice').textContent), null, { timeout: 15000 });
+  await a.waitForFunction(() => /Ana necesita modelos\/camion\.blend/.test(document.getElementById('sync-notice').textContent), null, { timeout: 15000 });
+  step('B pide el archivo y A recibe el aviso al momento');
+
+  await a.evaluate(() => { window.realNow = Date.now; Date.now = () => window.realNow() + 2 * 86400_000; });
+  await a.click('[data-action=sync-now]');
+  await a.waitForFunction(() => !document.getElementById('stale-locks').hidden && /desde hace más de un día: modelos\/camion\.blend/.test(document.getElementById('stale-locks').textContent), null, { timeout: 15000 });
+  await a.evaluate(() => { Date.now = window.realNow; });
+  step('Un bloqueo de más de un día muestra el recordatorio');
+
   // Conflicto: A sube v3 mientras B tiene cambios locales. B guarda copia y baja v3.
   await a.evaluate(async () => {
     const b = window.v1.slice(); b[5000] ^= 1;
@@ -198,6 +209,15 @@ try {
   await a.waitForFunction(() => /Listo: 2 archivo/.test(document.getElementById('sync-notice').textContent), null, { timeout: 30000 });
   await b.waitForFunction(() => window.row('texturas/chapa.png')?.status === 'ok' && window.row('modelos/pala.blend')?.status === 'ok', null, { timeout: 60000 });
   step('Subir todo agrega dos archivos con un comentario y B los recibe');
+
+  await a.fill('#filter', 'PALA');
+  await a.waitForFunction(() => [...document.querySelectorAll('#project-tables tbody tr')].length === 1, null, { timeout: 5000 });
+  assert.match(await a.textContent('#project-tables tbody'), /modelos\/pala\.blend/);
+  await a.fill('#filter', '');
+  await a.check('#only-pending');
+  await a.waitForFunction(() => /Ningún archivo coincide/.test(document.getElementById('project-tables').textContent), null, { timeout: 5000 });
+  await a.uncheck('#only-pending');
+  step('El buscador y "Solo lo que necesita algo de mí" filtran la tabla');
 
   // Lo que hace soltar una carpeta: copiarla con su estructura e ignorar respaldos.
   const copied = await a.evaluate(async () => {

@@ -372,3 +372,5 @@ ol.steps-small { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; l
 .comfort { align-items: flex-start; }
 .file-input { height: auto; padding: 8px 12px; }
 .upload-foot { align-items: center; justify-content: space-between; gap: 12px; }
+.notice.warn { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
+.sync-filter { margin-top: 8px; }

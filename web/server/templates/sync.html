@@ -11,6 +11,7 @@
 </div>
 
 <p class="notice" id="sync-notice" role="status" hidden></p>
+<p class="notice warn" id="stale-locks" hidden></p>
 
 <section class="panel" id="sync-unsupported" hidden>
   <h2>Abre esta página en Microsoft Edge o Google Chrome</h2>
@@ -57,6 +58,12 @@
     <div class="panel check-list" id="project-picks"></div>
   </section>
 
+  <div class="toolbar sync-filter">
+    <form role="search" id="filter-form">
+      <input class="input" id="filter" type="search" placeholder="Buscar archivo en mis proyectos" aria-label="Buscar archivo">
+    </form>
+    <label class="check"><input type="checkbox" id="only-pending"> Solo lo que necesita algo de mí</label>
+  </div>
   <div id="project-tables"></div>
 
   <div class="ledger-head">

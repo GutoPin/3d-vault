@@ -30,6 +30,49 @@ PORT = 18090
 BASE = f"http://127.0.0.1:{PORT}"
 
 
+VALID_ICONS = {i.identifier for i in bpy.types.UILayout.bl_rna.functions["label"].parameters["icon"].enum_items}
+
+
+class FakeLayout:
+    """Ejecuta los draw del panel sin interfaz: valida íconos y operadores."""
+
+    def __init__(self, seen):
+        self.seen = seen
+        self.enabled = True
+        self.scale_y = 1
+
+    def _icon(self, icon):
+        assert icon in VALID_ICONS, f"ícono inválido {icon}"
+
+    def label(self, text="", icon="NONE"):
+        self._icon(icon)
+        self.seen.append(text)
+
+    def operator(self, idname, text="", icon="NONE"):
+        self._icon(icon)
+        group, name = idname.split(".")
+        assert hasattr(getattr(bpy.ops, group), name) and getattr(getattr(bpy.ops, group), name).poll is not None, idname
+        getattr(getattr(bpy.ops, group), name).get_rna_type()  # falla si no está registrado
+        self.seen.append(f"[{text or idname}]")
+        return types.SimpleNamespace()
+
+    def prop(self, *_args, **_kw):
+        pass
+
+    def box(self, **_kw):
+        return self
+
+    row = column = box
+
+
+def draw_panels():
+    seen = []
+    addon.THREEDVAULT_PT_panel.draw(types.SimpleNamespace(layout=FakeLayout(seen)), bpy.context)
+    if addon.THREEDVAULT_PT_versions.poll(bpy.context):
+        addon.THREEDVAULT_PT_versions.draw(types.SimpleNamespace(layout=FakeLayout(seen)), bpy.context)
+    return " ".join(seen)
+
+
 def step(msg):
     print("✔", msg, flush=True)
 
@@ -104,15 +147,19 @@ def run(data):
     save_scene(path, 1)
     addon.refresh()
     assert st["status"] and st["status"]["state"] == "new", (st["error"], st["path"], bpy.data.filepath)
+    assert "[Agregar a 3D-Vault]" in draw_panels()
     bpy.ops.three_d_vault.upload(comment="Primera versión")
     assert st["status"]["state"] == "current" and st["status"]["asset"]["head_version"] == 1, (st["error"], st["status"])
     assert st["notice"] == "Subido como v1.", st["notice"]
+    sha_v1 = vault.file_sha256(path)
+    assert st["addon_update"] == "", "el servidor entrega la misma versión del complemento"
     step(f"Agregar desde Blender: {st['notice']}")
 
     bpy.ops.three_d_vault.lock()
     assert st["status"]["locked_by_me"], st
     lock = st["status"]["lock"]
     assert lock["client_id"] == "pc-guto", lock
+    assert "[three_d_vault.unlock]" in draw_panels() and "Bloqueado por ti" in draw_panels(), draw_panels()
     step("Bloquear desde Blender usa la identidad de Mi carpeta (misma PC)")
 
     assert st["status"]["compressed"], "Blender 5 guarda comprimido por defecto"
@@ -143,6 +190,8 @@ def run(data):
     bpy.ops.wm.open_mainfile(filepath=path)
     addon.refresh()
     assert st["status"]["state"] == "outdated" and st["status"]["local_version"] == 2, st["status"]
+    shown = draw_panels()
+    assert "[Actualizar a v3]" in shown and "(la que tienes)" in shown, shown
     bpy.ops.three_d_vault.update()
     assert vault.file_sha256(path) == ana_sha, "el archivo no quedó igual al de Ana"
     assert st["status"]["state"] == "current", st["status"]
@@ -150,12 +199,27 @@ def run(data):
     assert any(o.name.startswith("Cylinder") for o in bpy.data.objects), [o.name for o in bpy.data.objects]
     step("Actualizar baja la v3 de Ana y se abre con su cilindro")
 
+    addon.refresh()
+    assert [v["number"] for v in st["status"]["versions"]] == [3, 2, 1], st["status"]["versions"]
+    v1 = st["status"]["versions"][-1]
+    bpy.ops.three_d_vault.open_version(version_id=v1["id"])
+    copy = st["notice"].split(": ", 1)[1]
+    assert vault.file_sha256(copy) == sha_v1 and vault.file_sha256(path) == ana_sha, st["notice"]
+    step(f"Versiones: abrir aparte la v1 la baja idéntica a {os.path.basename(copy)} sin tocar el archivo de trabajo")
+
     ost = other.status(other_path)
     other.lock(ost)
     addon.refresh()
     bpy.ops.three_d_vault.lock()
     assert st["error"] and "Ana" in st["error"], st["error"]
     step(f"Bloquear lo que tiene Ana falla con: «{st['error']}»")
+
+    assert "[three_d_vault.request_unlock]" in draw_panels(), draw_panels()
+    bpy.ops.three_d_vault.request_unlock()
+    assert st["notice"] and "Ana recibirá un aviso" in st["notice"], (st["notice"], st["error"])
+    events = call("GET", "/api/projects/1/events?since=0", token=ana)["events"]
+    assert any(e["kind"] == "unlock_requested" and e["payload"]["actor_name"] == "Guto" for e in events)
+    step("Pedir que lo libere desde Blender le llega a Ana como evento")
 
     # Conflicto: guto cambia sin bloquear; Ana sube la v4; al actualizar, copia.
     bpy.ops.mesh.primitive_torus_add(location=(4, 4, 0))
@@ -171,6 +235,13 @@ def run(data):
     copies = glob.glob(os.path.join(root, "camion.conflicto-guto-*.blend"))
     assert len(copies) == 1 and vault.file_sha256(path) == vault.file_sha256(other_path), copies
     step(f"Conflicto sin pérdida: queda {os.path.basename(copies[0])} y la v4 de Ana")
+
+    vault.own_version = lambda: "0.9.0"
+    st["addon_update"] = None
+    addon.refresh()
+    assert st["addon_update"] == "1.1.0", st["addon_update"]
+    assert "[three_d_vault.get_addon]" in draw_panels()
+    step("Avisa cuando el servidor tiene una versión más nueva del complemento")
 
     addon.unregister()
 

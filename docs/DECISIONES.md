@@ -181,6 +181,12 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | `/blender/3dvault.zip` se arma desde los archivos incluidos en el binario | El complemento siempre corresponde a la versión del servidor |
 | Licencia del complemento: GPL-3.0-or-later | Usa la API de Blender, que es GPL. Solo afecta al complemento |
 | Un archivo nuevo con el mismo contenido que uno que falta es un renombrado; se ofrece "Mover en el servidor" | Cumple "renombrar en el Explorador no bifurca el historial" sin propagar nada solo |
+| "Pedir que lo libere": evento `unlock_requested` y registro de actividad, sin estado nuevo | Llega al momento por el mismo canal SSE. Una petición por persona y archivo cada 5 minutos, comprobada en la actividad: sin estado en memoria y sobrevive a reinicios |
+| Recordatorio de bloqueos propios de más de un día en Mi carpeta | Un bloqueo olvidado frena a todo el equipo. Se calcula en el navegador con las filas que ya tiene |
+| En Blender, "Abrir aparte" baja una versión a la carpeta temporal y la abre en otra instancia de Blender | Comparar versiones sin tocar el archivo de trabajo ni la carpeta sincronizada. Reutiliza los trozos del archivo local |
+| El complemento compara su versión con `/blender/version` una vez por sesión | Avisa de actualizaciones sin un sistema de actualizaciones propio |
+| La prueba del complemento ejecuta los `draw` del panel con una maqueta de layout que valida íconos y operadores | Sin interfaz, un nombre de ícono u operador equivocado solo fallaría en la Blender real |
+| Buscador y "Solo lo que necesita algo de mí" en Mi carpeta, en el navegador | Filtra las filas que ya están en memoria |
 | Subir desde la ficha o el proyecto con `pushFile`, compartida con Mi carpeta | Sirve en cualquier navegador. Usa la identidad de Mi carpeta solo si el bloqueo es de ella; si no, la de la web, igual que los botones de esa página |
 
 ## Cambios a la especificación

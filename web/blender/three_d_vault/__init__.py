@@ -5,13 +5,17 @@ carpeta de esa PC (el código de conexión), así que un bloqueo hecho aquí val
 también allí. La lógica está en vault.py; aquí solo está la interfaz.
 """
 
+import os
+import subprocess
+import tempfile
 import textwrap
 import threading
 import traceback
+from datetime import datetime
 
 import bpy
 from bpy.app.handlers import persistent
-from bpy.props import BoolProperty, StringProperty
+from bpy.props import BoolProperty, IntProperty, StringProperty
 
 from . import vault
 
@@ -126,7 +130,17 @@ def refresh(alert=False, after_save=False):
             alert_on_save(st)
 
     # Revisar sigue a casi todo: no borra el aviso de lo que acaba de pasar.
-    run_job("Revisando", lambda: get_vault().status(path), done, keep_notice=True)
+    def work():
+        v = get_vault()
+        st = v.status(path)
+        if STATE.get("addon_update") is None:  # una vez por sesión
+            try:
+                STATE["addon_update"] = v.addon_update() or ""
+            except vault.VaultError:
+                STATE["addon_update"] = ""
+        return st
+
+    run_job("Revisando", work, done, keep_notice=True)
 
 
 def lock_text(st):
@@ -288,6 +302,44 @@ class THREEDVAULT_OT_update(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class THREEDVAULT_OT_request(bpy.types.Operator):
+    bl_idname = "three_d_vault.request_unlock"
+    bl_label = "Pedir que lo libere"
+    bl_description = "Avisar a quien tiene el archivo de que lo necesitas. Le llega en Mi carpeta"
+
+    def execute(self, _context):
+        st = STATE["status"]
+
+        def done(_):
+            STATE["notice"] = f"Listo: {st['lock']['display_name']} recibirá un aviso de que lo necesitas."
+
+        run_job("Avisando", lambda: get_vault().request_unlock(st), done)
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_open_version(bpy.types.Operator):
+    bl_idname = "three_d_vault.open_version"
+    bl_label = "Abrir aparte"
+    bl_description = "Bajar esta versión a una carpeta temporal y abrirla en otra ventana de Blender, para compararla. Tu archivo no cambia"
+
+    version_id: IntProperty()
+
+    def execute(self, _context):
+        st = STATE["status"]
+        version = next(v for v in st["versions"] if v["id"] == self.version_id)
+        path = bpy.data.filepath
+        stem = os.path.splitext(os.path.basename(path))[0]
+        dest = os.path.join(tempfile.gettempdir(), "3D-Vault", f"{stem} v{version['number']}.blend")
+
+        def done(out):
+            STATE["notice"] = f"v{version['number']} abierta aparte: {out}"
+            if bpy.app.binary_path and not bpy.app.background:
+                subprocess.Popen([bpy.app.binary_path, out])
+
+        run_job(f"Bajando v{version['number']}", lambda: get_vault().download_version(path, st, version, dest, progress), done)
+        return {"FINISHED"}
+
+
 class THREEDVAULT_OT_uncompress(bpy.types.Operator):
     bl_idname = "three_d_vault.save_uncompressed"
     bl_label = "Guardar sin comprimir"
@@ -296,6 +348,16 @@ class THREEDVAULT_OT_uncompress(bpy.types.Operator):
     def execute(self, _context):
         bpy.ops.wm.save_mainfile(compress=False)
         STATE["notice"] = "Guardado sin comprimir. Las próximas versiones subirán mucho menos."
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_get_addon(bpy.types.Operator):
+    bl_idname = "three_d_vault.get_addon"
+    bl_label = "Descargar la versión nueva"
+    bl_description = "Bajar la versión nueva del complemento. Luego instálala igual que la primera vez"
+
+    def execute(self, _context):
+        bpy.ops.wm.url_open(url=vault.parse_code(prefs().code)["server"] + "/blender/3dvault.zip")
         return {"FINISHED"}
 
 
@@ -350,6 +412,10 @@ class THREEDVAULT_PT_panel(bpy.types.Panel):
             layout.operator("three_d_vault.refresh", icon="FILE_REFRESH")
             return
 
+        if STATE.get("addon_update"):
+            box = layout.box()
+            wrapped(box, f"Hay una versión nueva del complemento ({STATE['addon_update']}).", "INFO")
+            box.operator("three_d_vault.get_addon", icon="IMPORT")
         if STATE["busy"]:
             p = STATE["progress"]
             text = STATE["busy"] + "…"
@@ -403,6 +469,8 @@ class THREEDVAULT_PT_panel(bpy.types.Panel):
                 col.operator("three_d_vault.lock", text="Traer el bloqueo a esta PC", icon="LOCKED").takeover = True
             elif not st.get("lock"):
                 col.operator("three_d_vault.lock", icon="LOCKED")
+            else:
+                col.operator("three_d_vault.request_unlock", icon="HAND")
 
         if st.get("compressed") and (not asset or st.get("locked_by_me")):
             tip = layout.box()
@@ -412,6 +480,40 @@ class THREEDVAULT_PT_panel(bpy.types.Panel):
         row = layout.row(align=True)
         row.operator("three_d_vault.refresh", icon="FILE_REFRESH")
         row.operator("three_d_vault.open_web", icon="URL")
+
+
+def short_date(iso):
+    try:
+        return datetime.fromisoformat(iso).astimezone().strftime("%d/%m %H:%M")
+    except ValueError:
+        return ""
+
+
+class THREEDVAULT_PT_versions(bpy.types.Panel):
+    bl_label = "Versiones"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "3D-Vault"
+    bl_parent_id = "THREEDVAULT_PT_panel"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, _context):
+        st = STATE["status"]
+        return bool(st and st.get("versions") and STATE["path"] == bpy.data.filepath)
+
+    def draw(self, _context):
+        st = STATE["status"]
+        current = st.get("local_version")
+        for v in st["versions"][:10]:
+            box = self.layout.box()
+            row = box.row()
+            mark = "  (la que tienes)" if v["number"] == current else ""
+            row.label(text=f"v{v['number']} · {v['uploaded_by']} · {short_date(v['created_at'])}{mark}")
+            if v["number"] != current:
+                op = row.operator("three_d_vault.open_version", text="", icon="WINDOW")
+                op.version_id = v["id"]
+            wrapped(box, v["comment"], width=40)
 
 
 class THREEDVAULT_Preferences(bpy.types.AddonPreferences):
@@ -455,7 +557,8 @@ def on_save(_dummy):
 
 CLASSES = (
     THREEDVAULT_OT_refresh, THREEDVAULT_OT_lock, THREEDVAULT_OT_unlock, THREEDVAULT_OT_upload,
-    THREEDVAULT_OT_update, THREEDVAULT_OT_uncompress, THREEDVAULT_OT_open_web, THREEDVAULT_OT_test, THREEDVAULT_PT_panel,
+    THREEDVAULT_OT_update, THREEDVAULT_OT_uncompress, THREEDVAULT_OT_open_web, THREEDVAULT_OT_test, THREEDVAULT_OT_request,
+    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_PT_panel, THREEDVAULT_PT_versions,
     THREEDVAULT_Preferences,
 )
 

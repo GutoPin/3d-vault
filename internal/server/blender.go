@@ -3,8 +3,10 @@ package server
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"io/fs"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"3d-vault/web"
@@ -48,4 +50,23 @@ func (s *Server) blenderAddon(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "application/zip")
 	h.Set("Content-Disposition", `attachment; filename="3dvault-blender.zip"`)
 	_, _ = buf.WriteTo(w)
+}
+
+var manifestVersion = regexp.MustCompile(`(?m)^version\s*=\s*"([^"]+)"`)
+
+// blenderVersion dice qué versión del complemento entrega el servidor, para que
+// el complemento avise si hay una más nueva.
+func (s *Server) blenderVersion(w http.ResponseWriter, r *http.Request) {
+	raw, err := fs.ReadFile(web.Blender, web.BlenderDir+"/blender_manifest.toml")
+	if err != nil {
+		s.webFail(w, r, err)
+		return
+	}
+	m := manifestVersion.FindSubmatch(raw)
+	if m == nil {
+		s.webFail(w, r, errors.New("el manifiesto del complemento no tiene versión"))
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write(m[1])
 }
