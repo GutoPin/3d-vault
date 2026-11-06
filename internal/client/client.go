@@ -3,6 +3,7 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -376,4 +377,72 @@ func (c *Client) Manifest(ctx context.Context, versionID int64) (manifest.Manife
 		return c.doJSON(ctx, jsonTimeout, http.MethodGet, fmt.Sprintf("/api/versions/%d/manifest", versionID), nil, &m)
 	})
 	return m, err
+}
+
+// Move cambia la ruta de un archivo en el servidor y conserva su historial.
+func (c *Client) Move(ctx context.Context, assetID, baseVersion int64, path string) (vault.Asset, error) {
+	var asset vault.Asset
+	err := c.doJSON(ctx, jsonTimeout, http.MethodPost, fmt.Sprintf("/api/assets/%d/move", assetID), map[string]any{"base_version": baseVersion, "path": path}, &asset)
+	return asset, err
+}
+
+// Delete hace un borrado suave en el servidor.
+func (c *Client) Delete(ctx context.Context, assetID, baseVersion int64) error {
+	return c.doJSON(ctx, jsonTimeout, http.MethodDelete, fmt.Sprintf("/api/assets/%d?base_version=%d", assetID, baseVersion), nil, nil)
+}
+
+// streamStall es cuánto se espera sin recibir nada. El servidor envía un latido cada
+// 25 s, así que tanto silencio indica una conexión muerta que TCP aún no ha notado.
+const streamStall = 90 * time.Second
+
+// Stream escucha eventos hasta que la conexión se corta o ctx termina, y siempre
+// devuelve un error. onEvent recibe el tipo de cada evento, incluido el saludo
+// inicial, que indica que ya no se pierde ningún cambio a partir de ese momento.
+func (c *Client) Stream(ctx context.Context, projectIDs []int64, onEvent func(kind string)) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	ids := make([]string, len(projectIDs))
+	for i, id := range projectIDs {
+		ids[i] = strconv.FormatInt(id, 10)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/stream?projects="+strings.Join(ids, ","), nil)
+	if err != nil {
+		return fmt.Errorf("preparar la petición: %w", err)
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		return readError(resp)
+	}
+
+	watchdog := time.AfterFunc(streamStall, cancel)
+	defer watchdog.Stop()
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 64<<10), 4<<20)
+	for scanner.Scan() {
+		watchdog.Reset(streamStall)
+		if kind, ok := strings.CutPrefix(scanner.Text(), "event: "); ok {
+			onEvent(kind)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return io.ErrUnexpectedEOF
+}
+
+// IsUnauthorized indica que el token ya no es válido.
+func IsUnauthorized(err error) bool {
+	var serverErr *ServerError
+	return errors.As(err, &serverErr) && serverErr.Status == http.StatusUnauthorized
 }

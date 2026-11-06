@@ -21,45 +21,46 @@ import (
 // maxParallel es el máximo de trozos en tránsito a la vez (sección 8 de PLAN.md).
 const maxParallel = 4
 
-// scannedFile es un archivo local cortado en trozos, con la posición de cada uno.
-type scannedFile struct {
-	manifest manifest.Manifest
+// Scan es un archivo local cortado en trozos, con la posición de cada uno.
+type Scan struct {
+	Manifest manifest.Manifest
 	// offsets guarda dónde está cada trozo distinto.
 	offsets map[chunker.Hash]int64
 	unique  []chunker.Hash
 }
 
-func scanFile(path string) (scannedFile, error) {
+// ScanFile corta un archivo y calcula su manifiesto.
+func ScanFile(path string) (Scan, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return scannedFile{}, fmt.Errorf("abrir el archivo: %w", err)
+		return Scan{}, fmt.Errorf("abrir el archivo: %w", err)
 	}
 	defer f.Close()
 
 	fileHash := sha256.New()
 	c := chunker.New(io.TeeReader(f, fileHash))
-	scan := scannedFile{offsets: make(map[chunker.Hash]int64)}
+	scan := Scan{offsets: make(map[chunker.Hash]int64)}
 	for {
 		chunk, err := c.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return scannedFile{}, fmt.Errorf("cortar el archivo: %w", err)
+			return Scan{}, fmt.Errorf("cortar el archivo: %w", err)
 		}
-		scan.manifest.Chunks = append(scan.manifest.Chunks, manifest.Chunk{SHA256: chunk.Hash, Size: int64(len(chunk.Data))})
+		scan.Manifest.Chunks = append(scan.Manifest.Chunks, manifest.Chunk{SHA256: chunk.Hash, Size: int64(len(chunk.Data))})
 		if _, seen := scan.offsets[chunk.Hash]; !seen {
 			scan.offsets[chunk.Hash] = chunk.Offset
 			scan.unique = append(scan.unique, chunk.Hash)
 		}
 	}
-	copy(scan.manifest.FileSHA256[:], fileHash.Sum(nil))
+	copy(scan.Manifest.FileSHA256[:], fileHash.Sum(nil))
 	return scan, nil
 }
 
-func (s scannedFile) chunkSizes() map[chunker.Hash]int64 {
+func (s Scan) chunkSizes() map[chunker.Hash]int64 {
 	sizes := make(map[chunker.Hash]int64, len(s.unique))
-	for _, c := range s.manifest.Chunks {
+	for _, c := range s.Manifest.Chunks {
 		sizes[c.SHA256] = c.Size
 	}
 	return sizes
@@ -105,13 +106,15 @@ func (c *Client) Push(ctx context.Context, in PushInput) (PushResult, error) {
 	if err != nil {
 		return PushResult{}, err
 	}
-	scan, err := scanFile(in.LocalPath)
+	scan, err := ScanFile(in.LocalPath)
 	if err != nil {
 		return PushResult{}, err
 	}
 
-	result := PushResult{TotalChunks: len(scan.manifest.Chunks), TotalBytes: scan.manifest.Size()}
-	if err := c.uploadMissing(ctx, in.LocalPath, scan, &result); err != nil {
+	result := PushResult{TotalChunks: len(scan.Manifest.Chunks), TotalBytes: scan.Manifest.Size()}
+	stats, err := c.UploadChunks(ctx, in.LocalPath, scan, nil)
+	result.UploadedChunks, result.UploadedBytes = stats.Chunks, stats.Bytes
+	if err != nil {
 		return result, err
 	}
 
@@ -120,7 +123,7 @@ func (c *Client) Push(ctx context.Context, in PushInput) (PushResult, error) {
 		return result, err
 	}
 	if !found {
-		result.Commit, err = c.CreateAsset(ctx, in.ProjectID, path.Clean, scan.manifest, in.Comment)
+		result.Commit, err = c.CreateAsset(ctx, in.ProjectID, path.Clean, scan.Manifest, in.Comment)
 		return result, err
 	}
 	base := in.BaseVersion
@@ -130,7 +133,7 @@ func (c *Client) Push(ctx context.Context, in PushInput) (PushResult, error) {
 	result.Commit, err = c.CommitVersion(ctx, CommitInput{
 		AssetID:     asset.ID,
 		BaseVersion: base,
-		Manifest:    scan.manifest,
+		Manifest:    scan.Manifest,
 		Comment:     in.Comment,
 		ReleaseLock: in.ReleaseLock,
 	})
@@ -151,18 +154,26 @@ func (c *Client) findAsset(ctx context.Context, projectID int64, path rules.Path
 	return vault.Asset{}, false, nil
 }
 
-func (c *Client) uploadMissing(ctx context.Context, localPath string, scan scannedFile, result *PushResult) error {
+// TransferStats resume los trozos que viajaron por la red.
+type TransferStats struct {
+	Chunks int
+	Bytes  int64
+}
+
+// UploadChunks sube los trozos que le faltan al servidor. onBytes, si no es nil, se
+// llama desde varias goroutines cada vez que termina un trozo.
+func (c *Client) UploadChunks(ctx context.Context, localPath string, scan Scan, onBytes func(int64)) (TransferStats, error) {
 	missing, err := c.MissingChunks(ctx, scan.unique)
 	if err != nil {
-		return err
+		return TransferStats{}, err
 	}
 	if len(missing) == 0 {
-		return nil
+		return TransferStats{}, nil
 	}
 
 	f, err := os.Open(localPath)
 	if err != nil {
-		return fmt.Errorf("abrir el archivo: %w", err)
+		return TransferStats{}, fmt.Errorf("abrir el archivo: %w", err)
 	}
 	defer f.Close()
 
@@ -173,7 +184,7 @@ func (c *Client) uploadMissing(ctx context.Context, localPath string, scan scann
 	for _, h := range missing {
 		offset, known := scan.offsets[h]
 		if !known {
-			return fmt.Errorf("el servidor pidió un trozo desconocido: %s", h)
+			return TransferStats{}, fmt.Errorf("el servidor pidió un trozo desconocido: %s", h)
 		}
 		group.Go(func() error {
 			data := make([]byte, sizes[h])
@@ -183,21 +194,25 @@ func (c *Client) uploadMissing(ctx context.Context, localPath string, scan scann
 			// Detecta que el archivo cambió mientras se subía, por ejemplo si alguien
 			// guarda desde Blender justo ahora.
 			if chunker.Hash(sha256.Sum256(data)) != h {
-				return errors.New("el archivo cambió durante la subida: vuelve a intentarlo cuando deje de cambiar")
+				return ErrFileChanged
 			}
 			if err := c.PutChunk(groupCtx, h, data); err != nil {
 				return err
 			}
 			uploadedChunks.Add(1)
 			uploadedBytes.Add(int64(len(data)))
+			if onBytes != nil {
+				onBytes(int64(len(data)))
+			}
 			return nil
 		})
 	}
 	err = group.Wait()
-	result.UploadedChunks = int(uploadedChunks.Load())
-	result.UploadedBytes = uploadedBytes.Load()
-	return err
+	return TransferStats{Chunks: int(uploadedChunks.Load()), Bytes: uploadedBytes.Load()}, err
 }
+
+// ErrFileChanged indica que el archivo local cambió durante la subida.
+var ErrFileChanged = errors.New("el archivo cambió durante la subida: vuelve a intentarlo cuando deje de cambiar")
 
 // PullInput describe una descarga.
 type PullInput struct {
@@ -255,33 +270,46 @@ func (c *Client) Pull(ctx context.Context, in PullInput) (PullResult, error) {
 		TotalBytes:  m.Size(),
 	}
 
-	local := scannedFile{offsets: map[chunker.Hash]int64{}}
+	var local *Scan
 	if _, statErr := os.Stat(in.LocalPath); statErr == nil {
-		local, err = scanFile(in.LocalPath)
+		scan, err := ScanFile(in.LocalPath)
 		if err != nil {
 			return result, err
 		}
-		if local.manifest.FileSHA256 == m.FileSHA256 {
+		if scan.Manifest.FileSHA256 == m.FileSHA256 {
 			result.AlreadyUpToDate = true
 			return result, nil
 		}
 		if !in.Overwrite {
 			return result, ErrLocalFileDiffers
 		}
+		local = &scan
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return result, fmt.Errorf("consultar el archivo local: %w", statErr)
 	}
 
-	return result, c.assemble(ctx, in.LocalPath, m, local, &result)
+	if err := os.MkdirAll(filepath.Dir(in.LocalPath), 0o750); err != nil {
+		return result, fmt.Errorf("crear la carpeta: %w", err)
+	}
+	tmpPath, stats, err := c.Assemble(ctx, m, filepath.Dir(in.LocalPath), in.LocalPath, local, nil)
+	result.DownloadedChunks, result.DownloadedBytes = stats.Chunks, stats.Bytes
+	if err != nil {
+		return result, err
+	}
+	if err := os.Rename(tmpPath, in.LocalPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return result, fmt.Errorf("reemplazar el archivo: %w", err)
+	}
+	return result, nil
 }
 
-func (c *Client) assemble(ctx context.Context, dst string, m manifest.Manifest, local scannedFile, result *PullResult) (err error) {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
-		return fmt.Errorf("crear la carpeta: %w", err)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(dst), ".3dvault-tmp-*")
+// Assemble reconstruye un archivo en un temporal dentro de tmpDir y verifica su
+// hash, sin tocar el destino. Aprovecha los trozos de basePath si base no es nil.
+// Devuelve la ruta del temporal: quien llama decide cómo y cuándo reemplazar.
+func (c *Client) Assemble(ctx context.Context, m manifest.Manifest, tmpDir, basePath string, base *Scan, onBytes func(int64)) (tmpPath string, stats TransferStats, err error) {
+	tmp, err := os.CreateTemp(tmpDir, ".3dvault-tmp-*")
 	if err != nil {
-		return fmt.Errorf("crear el temporal: %w", err)
+		return "", TransferStats{}, fmt.Errorf("crear el temporal: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -290,14 +318,14 @@ func (c *Client) assemble(ctx context.Context, dst string, m manifest.Manifest, 
 		}
 	}()
 	if err := tmp.Truncate(m.Size()); err != nil {
-		return fmt.Errorf("reservar espacio: %w", err)
+		return "", TransferStats{}, fmt.Errorf("reservar espacio: %w", err)
 	}
 
 	var src *os.File
-	if len(local.offsets) > 0 {
-		src, err = os.Open(dst)
+	if base != nil {
+		src, err = os.Open(basePath)
 		if err != nil {
-			return fmt.Errorf("abrir el archivo local: %w", err)
+			return "", TransferStats{}, fmt.Errorf("abrir el archivo local: %w", err)
 		}
 		defer src.Close()
 	}
@@ -310,7 +338,7 @@ func (c *Client) assemble(ctx context.Context, dst string, m manifest.Manifest, 
 		at := offset
 		offset += chunk.Size
 		group.Go(func() error {
-			data, reused := readLocalChunk(src, local, chunk)
+			data, reused := readLocalChunk(src, base, chunk)
 			if !reused {
 				var err error
 				data, err = c.GetChunk(groupCtx, chunk.SHA256)
@@ -323,41 +351,38 @@ func (c *Client) assemble(ctx context.Context, dst string, m manifest.Manifest, 
 			if _, err := tmp.WriteAt(data, at); err != nil {
 				return fmt.Errorf("escribir el temporal: %w", err)
 			}
+			if onBytes != nil {
+				onBytes(chunk.Size)
+			}
 			return nil
 		})
 	}
 	err = group.Wait()
-	result.DownloadedChunks = int(downloadedChunks.Load())
-	result.DownloadedBytes = downloadedBytes.Load()
+	stats = TransferStats{Chunks: int(downloadedChunks.Load()), Bytes: downloadedBytes.Load()}
 	if err != nil {
-		return err
+		return "", stats, err
 	}
 
 	if err := verifyFile(tmp, m.FileSHA256); err != nil {
-		return err
+		return "", stats, err
 	}
 	if err := tmp.Sync(); err != nil {
-		return fmt.Errorf("sincronizar el temporal: %w", err)
+		return "", stats, fmt.Errorf("sincronizar el temporal: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("cerrar el temporal: %w", err)
+		return "", stats, fmt.Errorf("cerrar el temporal: %w", err)
 	}
-	if src != nil {
-		if err := src.Close(); err != nil {
-			return fmt.Errorf("cerrar el archivo local: %w", err)
-		}
-	}
-	if err := os.Rename(tmp.Name(), dst); err != nil {
-		return fmt.Errorf("reemplazar el archivo: %w", err)
-	}
-	return nil
+	return tmp.Name(), stats, nil
 }
 
 // readLocalChunk intenta sacar un trozo del archivo local. Si no coincide con su
 // hash, lo trata como ausente: el archivo pudo cambiar desde que se leyó.
-func readLocalChunk(src *os.File, local scannedFile, chunk manifest.Chunk) ([]byte, bool) {
+func readLocalChunk(src *os.File, local *Scan, chunk manifest.Chunk) ([]byte, bool) {
+	if local == nil || src == nil {
+		return nil, false
+	}
 	offset, ok := local.offsets[chunk.SHA256]
-	if !ok || src == nil {
+	if !ok {
 		return nil, false
 	}
 	data := make([]byte, chunk.Size)
