@@ -37,7 +37,7 @@ Por un canal privado:
 
 1. La dirección: `https://TU_DOMINIO/sync`
 2. Su usuario y su contraseña.
-3. La guía [`GUIA_USUARIO.md`](GUIA_USUARIO.md). Que sigan el apartado para instalarla como aplicación y abrirla al iniciar sesión: es lo que hace que la sincronización sea automática.
+3. El PDF [`3D-Vault-guia-modeladores.pdf`](3D-Vault-guia-modeladores.pdf) (o la guía [`GUIA_USUARIO.md`](GUIA_USUARIO.md)). Que sigan el apartado para instalarla como aplicación y abrirla al iniciar sesión: es lo que hace que la sincronización sea automática.
 
 ## Complemento de Blender
 

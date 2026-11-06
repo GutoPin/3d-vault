@@ -122,7 +122,7 @@ td { padding: calc((var(--row-height) - 20px) / 2) 12px; border-bottom: 1px soli
 tbody tr:last-child td { border-bottom: 0; }
 /* no hover that changes the fill; a row that drives a detail pane takes the nav pill's fill when selected */
 tbody tr[aria-selected="true"] td { background: var(--active); }
-th.n, td.n { text-align: right; }
+th.n, td.n { text-align: right; white-space: nowrap; }
 td .sub { display: block; font-size: var(--fs-small); color: var(--muted); }
 .truncate { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

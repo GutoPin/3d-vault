@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e test-blender test-blender-e2e
+.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e test-blender test-blender-e2e guia-pdf
 
 # Limitado a 2 núcleos y prioridad baja: la máquina de desarrollo es modesta.
 LIMITS := GOMAXPROCS=2 nice -n 19
@@ -41,5 +41,9 @@ test-blender:
 
 test-blender-e2e: build-server
 	nice -n 19 $(PY) web/blender/test_addon_blender.py
+
+# PDF de la guía para modeladores, desde docs/guia-modeladores/guia.html.
+guia-pdf:
+	cd web/e2e && npm ci --silent && node guia-pdf.mjs
 
 check: vet test

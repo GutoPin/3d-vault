@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>3D-Vault: cómo se usa</title>
+<style>
+  @font-face { font-family: "Geist"; src: url("../../web/server/static/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+  @page { size: A4; margin: 16mm 16mm 18mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 10.5pt/1.45 "Geist", system-ui, sans-serif; color: #000; }
+  h1 { font-size: 26pt; line-height: 1.1; margin: 0 0 4mm; }
+  h2 { font-size: 15pt; margin: 9mm 0 3mm; padding-top: 2mm; border-top: 2px solid #000; break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 2mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  ol, ul { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.4mm; }
+  b { font-weight: 650; }
+  .btn { display: inline-block; padding: 0 1.6mm; border: 1px solid #000; border-radius: 1.2mm; font-weight: 600; font-size: 9.5pt; white-space: nowrap; }
+  .key { display: inline-block; padding: 0 1.4mm; border: 1px solid #000; border-bottom-width: 2px; border-radius: 1mm; font-weight: 600; font-size: 9.5pt; }
+  .rule { margin: 3mm 0; padding: 2.5mm 3.5mm; border-left: 4px solid #000; background: #eee; break-inside: avoid; }
+  .rule b:first-child { display: block; }
+  .no { border-left-color: #000; background: #fff; border: 1.5px solid #000; border-left-width: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.8pt; break-inside: auto; }
+  th, td { border: 1px solid #000; padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #000; color: #fff; font-weight: 600; }
+  tr { break-inside: avoid; }
+  figure { margin: 3mm 0 4mm; break-inside: avoid; }
+  figure img { display: block; max-width: 100%; border: 1px solid #000; }
+  figcaption { font-size: 8.5pt; margin-top: 1mm; }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover .lead { font-size: 13pt; max-width: 140mm; }
+  .cover ol { font-size: 12pt; }
+  .page { break-before: page; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  code { font: 9.5pt ui-monospace, monospace; }
+  .small { font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div>
+    <h1>3D-Vault<br>cómo se usa</h1>
+    <p class="lead">Guía para modeladores. Pasos cortos, en orden. Si haces lo de la página 2 una sola vez y sigues las <b>4 reglas</b> de abajo, no vas a perder trabajo.</p>
+  </div>
+  <div>
+    <h3>Las 4 reglas</h3>
+    <ol>
+      <li><b>Bloquea antes de editar.</b> Siempre.</li>
+      <li><b>Sube con un comentario que diga qué cambiaste.</b></li>
+      <li><b>Libera cuando termines.</b> Si no, nadie más puede trabajar ese archivo.</li>
+      <li><b>No toques lo que está bloqueado por otro.</b> Pídele que lo libere.</li>
+    </ol>
+  </div>
+  <div class="small">
+    <p><b>Qué es:</b> un lugar en el servidor de la empresa donde están todos los archivos de cada proyecto, con todas sus versiones. Una carpeta de tu PC se mantiene igual que el servidor. Cuando subes un cambio, solo viaja lo que cambió.</p>
+    <p><b>Qué necesitas:</b> Microsoft Edge o Google Chrome. La dirección de 3D-Vault, tu usuario y tu contraseña (te los da el administrador). Blender 4.2 o más nuevo.</p>
+    <p><b>No hay que instalar ningún programa.</b> Todo es desde el navegador y desde Blender.</p>
+  </div>
+</section>
+
+<section class="page">
+  <h2>1. La primera vez (solo una vez)</h2>
+
+  <h3>1.1 Crear tu carpeta</h3>
+  <ol>
+    <li>Abre el Explorador de Windows.</li>
+    <li>Crea una carpeta nueva, por ejemplo <b>D:\3D-Vault</b> o <b>Documentos\3D-Vault</b>.</li>
+    <li>No uses Documentos ni el Escritorio directamente: tiene que ser una carpeta <b>dentro</b>.</li>
+  </ol>
+
+  <h3>1.2 Entrar y cambiar tu contraseña</h3>
+  <ol>
+    <li>Abre Edge. Escribe la dirección de 3D-Vault.</li>
+    <li>Escribe tu usuario y contraseña. <span class="btn">Entrar</span>.</li>
+    <li>Abajo a la izquierda, pulsa <b>tu nombre</b> (dice "Mi cuenta").</li>
+    <li>En <b>Cambiar mi contraseña</b>: la actual, la nueva dos veces (mínimo 10 letras). <span class="btn">Cambiar contraseña</span>.</li>
+  </ol>
+
+  <h3>1.3 Conectar tu carpeta</h3>
+  <ol>
+    <li>En el menú de la izquierda: <b>Mi carpeta</b>.</li>
+    <li><span class="btn">Elegir carpeta</span> → elige la carpeta del paso 1.1.</li>
+    <li>El navegador pregunta dos veces. Acepta las dos: <b>Ver archivos</b> y <b>Guardar cambios</b>.</li>
+    <li>Marca los proyectos en los que trabajas.</li>
+    <li>Te dice cuánto va a bajar. Acepta. Espera a que todo diga <b>Al día</b>.</li>
+  </ol>
+  <figure><img src="img/elegir.png" style="width:72%"><figcaption>Mi carpeta, la primera vez.</figcaption></figure>
+  <p>Dentro de tu carpeta aparece una carpeta por proyecto con todos sus archivos.</p>
+
+  <h3>1.4 Que se sincronice solo</h3>
+  <ol>
+    <li>En Mi carpeta, baja hasta <b>Comodidades</b> → <span class="btn">Instalar</span>.<br>Si no hay botón: menú <b>⋯</b> de Edge → <b>Aplicaciones</b> → <b>Instalar este sitio como aplicación</b>.</li>
+    <li>En la barra de direcciones de Edge escribe <code>edge://apps</code>.</li>
+    <li>Clic derecho sobre <b>3D-Vault</b> → marca <b>Iniciar automáticamente al iniciar sesión</b>.</li>
+    <li>De vuelta en Mi carpeta → <span class="btn">Activar avisos</span> → Permitir.</li>
+  </ol>
+  <p>Desde ahora, al prender la PC se abre 3D-Vault solo. <b>Déjalo abierto</b> (minimizado está bien). Cada vez que abra te puede pedir <span class="btn">Permitir y sincronizar</span>: púlsalo.</p>
+</section>
+
+<section class="page">
+  <h3>1.5 Conectar Blender</h3>
+  <ol>
+    <li>En Mi carpeta → Comodidades → Conectar Blender → <b>Descarga el complemento</b>. Baja un archivo <code>3dvault-blender.zip</code>. <b>No lo descomprimas.</b></li>
+    <li>Abre Blender → <b>Editar → Preferencias → Complementos</b> (<i>Edit → Preferences → Add-ons</i>).</li>
+    <li>Arriba a la derecha, la flecha <b>⌄</b> → <b>Instalar desde disco…</b> (<i>Install from Disk…</i>) → elige <code>3dvault-blender.zip</code>.</li>
+    <li>En <b>Preferencias → Sistema → Red</b>, marca <b>Permitir acceso en línea</b> (<i>System → Network → Allow Online Access</i>).</li>
+    <li>Vuelve a Mi carpeta → <span class="btn">Generar código</span> → <span class="btn">Copiar</span>.</li>
+    <li>En Blender, en las preferencias del complemento 3D-Vault, pega el código en <b>Código de conexión</b> → <span class="btn">Probar conexión</span>. Debe decir <b>Conectado como</b> tu nombre.</li>
+  </ol>
+  <figure><img src="img/blender.png" style="width:50%"><figcaption>Conectar Blender, en Mi carpeta. El código empieza con 3DV1.</figcaption></figure>
+  <p>El panel está en la vista 3D: tecla <span class="key">N</span> → pestaña <b>3D-Vault</b>.</p>
+
+  <h3>1.6 Guardar sin comprimir</h3>
+  <p>Con <b>Comprimir</b> activado, cada cambio de geometría sube el archivo casi entero. Sin comprimir, solo lo que cambió.</p>
+  <ol>
+    <li>Blender → <b>Editar → Preferencias → Guardar y cargar</b> → desmarca <b>Comprimir archivo</b> (<i>Save &amp; Load → Compress File</i>).</li>
+    <li>En archivos que ya existen, el panel 3D-Vault te avisa: pulsa <span class="btn">Guardar sin comprimir</span>.</li>
+  </ol>
+</section>
+
+<section class="page">
+  <h2>2. Editar un archivo (todos los días)</h2>
+
+  <h3>Desde Blender (lo normal)</h3>
+  <ol>
+    <li>Abre el archivo <b>desde tu carpeta de 3D-Vault</b> (no una copia en otro lado).</li>
+    <li>Tecla <span class="key">N</span> → pestaña <b>3D-Vault</b>.</li>
+    <li>Si dice <b>Tienes la v3 · hay v5</b> → <span class="btn">Actualizar a v5</span>.</li>
+    <li><span class="btn">Bloquear</span>. Ahora dice <b>Bloqueado por ti</b>.</li>
+    <li>Trabaja. Guarda con <span class="key">Ctrl</span> + <span class="key">S</span> las veces que quieras.</li>
+    <li>Cuando quieras que los demás lo tengan: <span class="btn">Guardar y subir</span>.</li>
+    <li>Escribe qué cambiaste. Deja marcado <b>Liberar el bloqueo al terminar</b> si ya acabaste. <span class="btn">Subir</span>.</li>
+    <li>Espera el mensaje <b>Subido como v6</b>.</li>
+  </ol>
+
+  <h3>Desde Mi carpeta (sin el panel de Blender)</h3>
+  <ol>
+    <li>En la fila del archivo: <span class="btn">Bloquear</span>.</li>
+    <li>Ábrelo en Blender. Si ya estaba abierto: <b>Archivo → Revertir</b> (<i>File → Revert</i>).</li>
+    <li>Trabaja y guarda. La fila pasa a <b>Cambios sin subir</b>.</li>
+    <li><span class="btn">Subir…</span> → qué cambiaste → <span class="btn">Subir</span>.</li>
+  </ol>
+  <figure><img src="img/tabla.png" style="width:74%"><figcaption>Mi carpeta: un archivo bloqueado por otra persona, uno tuyo con cambios para subir y uno nuevo.</figcaption></figure>
+  <figure><img src="img/dialogo.png" style="width:40%"><figcaption>Al subir: qué cambió y si liberas.</figcaption></figure>
+
+  <div class="rule"><b>Comentarios que sirven</b>"Cabina con más detalle y faros nuevos". "Corregí escala de las ruedas". No sirven: "cambios", "v2", "asdf".</div>
+</section>
+
+<section class="page">
+  <h2>3. Archivos nuevos</h2>
+  <ol>
+    <li>Guarda o copia el archivo <b>dentro de la carpeta del proyecto</b> (la subcarpeta que quieras).</li>
+    <li>En Mi carpeta aparece como <b>Nuevo, sin subir</b> → <span class="btn">Agregar…</span> → comentario → <span class="btn">Subir</span>.</li>
+  </ol>
+  <p><b>Más rápido:</b> arrastra archivos o carpetas desde el Explorador y suéltalos sobre la tabla del proyecto en Mi carpeta. Se copian y se suben con un solo comentario.</p>
+  <p><b>Varios a la vez:</b> el botón <span class="btn">Subir todo (N)</span>, al lado del nombre del proyecto.</p>
+  <p><b>Desde Blender:</b> guarda el archivo nuevo dentro de la carpeta del proyecto → panel 3D-Vault → <span class="btn">Agregar a 3D-Vault</span>.</p>
+  <p>Los respaldos de Blender (<code>.blend1</code>, <code>.blend2</code>) y los temporales <b>no se suben</b>. Está bien.</p>
+
+  <div class="rule"><b>Variantes ≠ versiones</b>Versión = la historia de un mismo archivo (v1, v2, v3…). Si quieres un modelo bajo y uno alto en detalle al mismo tiempo, son <b>dos archivos</b>: <code>camion_bajo.blend</code> y <code>camion_alto.blend</code>.</div>
+
+  <h3>Texturas</h3>
+  <p>Si usas una imagen que está fuera de la carpeta del proyecto (por ejemplo en Descargas), los demás la ven <b>rosa</b>.</p>
+  <ol>
+    <li>El panel 3D-Vault lo avisa: <b>… imagen(es) no viajarán bien</b>.</li>
+    <li>Pulsa <span class="btn">Arreglar texturas</span>. Las copia a la carpeta <code>texturas</code> del proyecto y las sube.</li>
+    <li>Después sube el <code>.blend</code> (<span class="btn">Guardar y subir</span>).</li>
+  </ol>
+
+  <h2>4. Si el archivo lo tiene otra persona</h2>
+  <ol>
+    <li>Dice <b>Bloqueado por Ana</b>. Puedes abrirlo para mirar. <b>No lo edites.</b></li>
+    <li>Si lo necesitas: <span class="btn">Pedir que lo libere</span> (en Mi carpeta, en la web o en Blender). A Ana le llega un aviso.</li>
+    <li>Cuando Ana lo libera, te llega su versión sola. Ahí lo bloqueas tú.</li>
+  </ol>
+  <p>Si el bloqueo es tuyo pero de otra PC tuya: <span class="btn">Traer el bloqueo a esta PC</span>. Los cambios sin subir de la otra PC se quedan allá.</p>
+</section>
+
+<section class="page">
+  <h2>5. Versiones anteriores</h2>
+  <ol>
+    <li>Pulsa el nombre del archivo (en Mi carpeta o en el proyecto). Se abre su <b>ficha</b>.</li>
+    <li>En <b>Historial</b>: cada versión con quién, cuándo, el comentario y su miniatura. Pulsa la miniatura para verla grande.</li>
+    <li><b>Descargar</b>: baja esa versión. <b>Restaurar</b>: crea una versión nueva igual a esa (no borra nada).</li>
+  </ol>
+  <figure><img src="img/historial.png" style="width:92%"><figcaption>Historial de un archivo. "Cambió respecto a la anterior": cuánto viajó al subirla.</figcaption></figure>
+  <p><b>En Blender:</b> panel 3D-Vault → despliega <b>Versiones</b> → el botón de ventana de una versión la abre <b>aparte</b>, en otra ventana de Blender, para comparar. Tu archivo no cambia.</p>
+  <p><b>Modelos .glb, .fbx, .obj, .stl:</b> la ficha los muestra en 3D. Arrastra para girar, rueda para acercar.</p>
+
+  <h2>6. Renombrar, mover, borrar</h2>
+  <table>
+    <tr><th style="width:38%">Quiero…</th><th>Hago…</th></tr>
+    <tr><td>Cambiar el nombre o la carpeta</td><td>Hazlo en el Explorador. Mi carpeta muestra <b>Renombrado o movido</b> → <span class="btn">Mover en el servidor</span>. Conserva todas las versiones.</td></tr>
+    <tr><td>Recuperar algo que borré de mi carpeta</td><td>Dice <b>No está en tu carpeta</b> → <span class="btn">Descargar</span>.</td></tr>
+    <tr><td>Borrarlo para todos</td><td>Bórralo de tu carpeta → <span class="btn">Borrar del servidor</span>. El administrador puede recuperarlo un tiempo.</td></tr>
+  </table>
+  <p>Borrar de tu carpeta <b>no</b> lo borra del servidor.</p>
+
+  <h2>7. Buscar y mirar</h2>
+  <ul>
+    <li><b>Buscar archivos</b> (arriba a la izquierda): busca en todos los proyectos. Da igual mayúsculas y acentos.</li>
+    <li><b>Actividad</b>: quién subió, bloqueó o movió qué, y cuándo.</li>
+    <li><b>Mi cuenta</b>: tus bloqueos de todos los proyectos (puedes liberarlos ahí) y tus conexiones de Blender.</li>
+    <li>En un proyecto: <span class="btn">Descargar todo (.zip)</span> baja la última versión de todo, con carpetas.</li>
+    <li>En Mi carpeta: el buscador y <b>Solo lo que necesita algo de mí</b> para ver solo lo pendiente.</li>
+  </ul>
+</section>
+
+<section class="page">
+  <h2>8. Qué significa cada estado</h2>
+  <table>
+    <tr><th style="width:30%">Dice</th><th style="width:35%">Significa</th><th>Haces</th></tr>
+    <tr><td><b>Al día</b></td><td>Tienes la última versión</td><td>Nada</td></tr>
+    <tr><td><b>Bloqueado por ti</b></td><td>Lo estás editando tú</td><td>Trabaja, sube, libera</td></tr>
+    <tr><td><b>Bloqueado por Ana</b></td><td>Lo edita Ana</td><td>No lo edites. <span class="btn">Pedir que lo libere</span></td></tr>
+    <tr><td><b>Cambios sin subir</b></td><td>Guardaste y el servidor no lo tiene</td><td><span class="btn">Subir…</span></td></tr>
+    <tr><td><b>Sin bloquear</b> (debajo de Cambios sin subir)</td><td>Lo editaste sin bloquear</td><td><span class="btn">Bloquear</span> y luego sube</td></tr>
+    <tr><td><b>Nuevo, sin subir</b></td><td>Solo está en tu PC</td><td><span class="btn">Agregar…</span></td></tr>
+    <tr><td><b>Renombrado o movido</b></td><td>Le cambiaste nombre o carpeta</td><td><span class="btn">Mover en el servidor</span></td></tr>
+    <tr><td><b>No está en tu carpeta</b></td><td>Lo borraste o moviste</td><td><span class="btn">Descargar</span></td></tr>
+    <tr><td><b>Descargando / Subiendo 40&nbsp;%</b></td><td>Está trabajando</td><td>Espera. No cierres la ventana</td></tr>
+    <tr><td><b>Error: …</b></td><td>El mensaje dice qué pasó</td><td>Lee el mensaje. Si sigue, avisa</td></tr>
+  </table>
+
+  <h2>9. Si algo choca</h2>
+  <p>Si cambiaste un archivo <b>sin bloquearlo</b> y otra persona subió una versión antes, 3D-Vault <b>no borra tu trabajo</b>:</p>
+  <ol>
+    <li>Guarda tu copia junto al original con un nombre como <code>camion.conflicto-juan-20261106-1043.blend</code>.</li>
+    <li>Pone la versión del servidor en <code>camion.blend</code>.</li>
+    <li>Habla con la otra persona y decidan qué cambios quedan. Luego borren la copia.</li>
+  </ol>
+  <div class="rule no"><b>Para que no pase</b>Bloquea antes de editar. Siempre.</div>
+</section>
+
+<section class="page">
+  <h2>10. Problemas y qué hacer</h2>
+  <table>
+    <tr><th style="width:40%">Pasa esto</th><th>Haz esto</th></tr>
+    <tr><td>"Abre esta página en Microsoft Edge o Google Chrome"</td><td>Estás en Firefox o Safari. Abre la misma dirección en Edge.</td></tr>
+    <tr><td>No me deja elegir Documentos o el Escritorio</td><td>Elige una carpeta <b>dentro</b> de ellos (paso 1.1).</td></tr>
+    <tr><td>Pide permiso cada vez que abro</td><td><span class="btn">Permitir y sincronizar</span>. Si ofrece <b>Permitir siempre</b>, elígelo.</td></tr>
+    <tr><td>"Ya está abierta en otra pestaña"</td><td>Cierra la otra pestaña o ventana de 3D-Vault.</td></tr>
+    <tr><td>"Tu sesión terminó"</td><td>Entra otra vez con tu usuario y contraseña.</td></tr>
+    <tr><td>Dejó de sincronizar al rato</td><td>Edge "durmió" la pestaña. Usa la aplicación instalada (paso 1.4).</td></tr>
+    <tr><td>"Bloqueado por … desde …" al subir</td><td>No era tuyo el bloqueo. Pide que lo liberen.</td></tr>
+    <tr><td>"Bloqueado por ti en Navegador"</td><td>Lo bloqueaste desde la ficha web. <span class="btn">Traer el bloqueo a esta PC</span>.</td></tr>
+    <tr><td>Un archivo en "Error: … nombre reservado / caracteres no permitidos"</td><td>Renómbralo. Sin puntos ni espacios al final, sin <code>&lt; &gt; : " | ? *</code>.</td></tr>
+    <tr><td>Blender: "no tiene permiso para conectarse"</td><td>Preferencias → Sistema → Red → <b>Permitir acceso en línea</b> (<i>Allow Online Access</i>).</td></tr>
+    <tr><td>Blender: "La conexión ya no es válida"</td><td>Cambiaste la contraseña. Genera un código nuevo (paso 1.5).</td></tr>
+    <tr><td>Blender: "Este archivo no está en la carpeta de un proyecto"</td><td>Abriste una copia de otro lado. Abre el de tu carpeta de 3D-Vault.</td></tr>
+    <tr><td>Blender: "Bloquea el archivo antes de subirlo"</td><td><span class="btn">Bloquear</span> y vuelve a subir.</td></tr>
+    <tr><td>Texturas rosas</td><td>Quien subió el archivo pulsa <span class="btn">Arreglar texturas</span> y sube de nuevo.</td></tr>
+    <tr><td>Se cortó la subida (cerré, se fue internet)</td><td>Vuelve a subir. Solo manda lo que faltaba.</td></tr>
+    <tr><td>Nada de lo anterior</td><td>Avisa al administrador con el mensaje exacto (una foto de la pantalla sirve).</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <h2>Hoja rápida</h2>
+  <div class="two">
+    <div>
+      <h3>Empezar a editar</h3>
+      <ol>
+        <li>Abre el archivo de tu carpeta.</li>
+        <li><span class="key">N</span> → 3D-Vault.</li>
+        <li>Si hay versión nueva: <span class="btn">Actualizar</span>.</li>
+        <li><span class="btn">Bloquear</span>.</li>
+      </ol>
+      <h3>Terminar</h3>
+      <ol>
+        <li><span class="btn">Guardar y subir</span>.</li>
+        <li>Qué cambiaste.</li>
+        <li>Marcado: Liberar al terminar.</li>
+        <li>Espera "Subido como vN".</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Archivo nuevo</h3>
+      <ol>
+        <li>Guárdalo en la carpeta del proyecto.</li>
+        <li>Mi carpeta → <span class="btn">Agregar…</span><br>o arrástralo a la tabla.</li>
+      </ol>
+      <h3>Lo tiene otro</h3>
+      <ol>
+        <li>No lo edites.</li>
+        <li><span class="btn">Pedir que lo libere</span>.</li>
+      </ol>
+      <h3>Al final del día</h3>
+      <ol>
+        <li>Mi cuenta → <b>Mis bloqueos</b>.</li>
+        <li>Sube o libera lo que ya no estés editando.</li>
+      </ol>
+    </div>
+  </div>
+  <h3>Las 4 reglas</h3>
+  <ol>
+    <li><b>Bloquea antes de editar.</b></li>
+    <li><b>Sube con un comentario que diga qué cambiaste.</b></li>
+    <li><b>Libera cuando termines.</b></li>
+    <li><b>No toques lo que está bloqueado por otro.</b></li>
+  </ol>
+</section>
+
+</body>
+</html>

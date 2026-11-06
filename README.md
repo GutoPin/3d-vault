@@ -15,7 +15,7 @@ Sistema interno y autohospedado para guardar archivos 3D con historial de versio
 - **Colaboración y administración:** pedir que liberen un archivo, Mi cuenta, Actividad, búsqueda global, descargar proyectos como `.zip`, miniaturas por versión, copias de seguridad automáticas, aviso de disco, página de bloqueos y modo oscuro.
 - **Fase 4:** complemento de Blender (pestaña 3D-Vault, tecla N) para bloquear, guardar y subir, y actualizar sin salir de Blender. Se descarga desde Mi carpeta.
 
-Guías: [`docs/GUIA_USUARIO.md`](docs/GUIA_USUARIO.md) para modeladores y [`docs/ADMIN.md`](docs/ADMIN.md) para el administrador. El detalle y los resultados están en `docs/DECISIONES.md`.
+Guías: [`docs/3D-Vault-guia-modeladores.pdf`](docs/3D-Vault-guia-modeladores.pdf) (PDF paso a paso para repartir; se regenera con `make guia-pdf`), [`docs/GUIA_USUARIO.md`](docs/GUIA_USUARIO.md) para modeladores y [`docs/ADMIN.md`](docs/ADMIN.md) para el administrador. El detalle y los resultados están en `docs/DECISIONES.md`.
 
 ## Desplegar
 
