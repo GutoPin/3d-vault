@@ -138,7 +138,7 @@ td .sub { display: block; font-size: var(--fs-small); color: var(--muted); }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
 .btn.ghost { border-color: transparent; background: transparent; }
-.field { display: grid; gap: 8px; }
+.field { display: grid; gap: 8px; align-content: start; }
 .field label { font-weight: 500; }
 .field .hint { color: var(--muted); font-size: var(--fs-small); }
 .input, select.input { height: 38px; padding: 0 12px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); }
@@ -411,3 +411,19 @@ a.who:hover, a.who[aria-current="page"] { background: var(--raised); }
 .filters select.input { height: var(--control-height); max-width: 100%; }
 .more { display: flex; justify-content: center; margin-top: var(--gap); }
 .nowrap { white-space: nowrap; }
+
+
+/* ---------- administración: aviso de disco, bloqueos y descargas ---------- */
+.disk-alert { margin-bottom: var(--gap); padding: 8px 12px; border-radius: var(--radius-control); background: var(--pill-warning-bg); color: var(--pill-warning-ink); font-size: var(--fs-small); }
+.disk-alert a { font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.folder-zip { margin-left: 8px; color: var(--muted); font-size: var(--fs-small); }
+.folder-zip:hover { color: var(--text); }
+
+/* miniatura de cada versión del historial; al pulsarla se abre grande */
+.version-cell { display: flex; align-items: center; gap: 10px; }
+.history-thumb { flex: none; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--ground); overflow: hidden; cursor: zoom-in; }
+.history-thumb img { width: 40px; height: 40px; object-fit: cover; }
+.history-big { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); }
+.history-big:popover-open { display: grid; justify-items: end; gap: 12px; }
+.history-big img { width: min(512px, calc(100vw - 64px)); height: auto; max-height: calc(100svh - 120px); object-fit: contain; }
+.history-big::backdrop { background: rgb(10 10 10 / 0.35); }

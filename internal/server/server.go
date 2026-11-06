@@ -48,6 +48,11 @@ type Config struct {
 	MaxStreamAge time.Duration
 	// Now permite fijar el reloj en tests. Por defecto, time.Now.
 	Now func() time.Time
+	// Backups describe las copias automáticas, para la página Espacio.
+	Backups BackupConfig
+	// LowDisk decide si avisar a los admins de que queda poco disco. Por
+	// defecto, menos del 15 % o de 20 GB libres.
+	LowDisk func(free, total int64) bool
 }
 
 // Server contiene las dependencias de los manejadores.
@@ -63,6 +68,9 @@ type Server struct {
 	maxStreamAge    time.Duration
 	now             func() time.Time
 	pages           *pageSet
+	backups         BackupConfig
+	lowDisk         func(free, total int64) bool
+	disk            diskCache
 }
 
 // New devuelve el manejador HTTP completo.
@@ -83,6 +91,11 @@ func New(cfg Config) (http.Handler, error) {
 		maxStreamAge:    cfg.MaxStreamAge,
 		now:             cfg.Now,
 		pages:           pages,
+		backups:         cfg.Backups,
+		lowDisk:         cfg.LowDisk,
+	}
+	if s.lowDisk == nil {
+		s.lowDisk = defaultLowDisk
 	}
 	if s.log == nil {
 		s.log = slog.Default()

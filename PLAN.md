@@ -203,6 +203,8 @@ DOMAIN=3dvault.miempresa.com
 MAX_FILE_SIZE_GB=20
 ALLOWED_IPS=
 SESSION_HOURS=12
+BACKUP_DIR=/backup      # copia diaria hecha por serve; vacío la desactiva
+BACKUP_HOUR=3           # hora local (TZ) de esa copia
 ```
 
 ## 12. Fases y criterios de aceptación

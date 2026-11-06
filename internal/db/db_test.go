@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 )
 
 func openDB(t *testing.T) *DB {
@@ -250,5 +251,26 @@ func TestBackupToIsConsistentAndHandlesQuotes(t *testing.T) {
 	defer copied.Close()
 	if got := meta(t, copied, "x"); got != "guardado" {
 		t.Fatalf("x = %q", got)
+	}
+}
+
+// Una copia en marcha no debe esperar a las escrituras ni hacerlas esperar: el
+// servidor la hace mientras otros suben archivos.
+func TestBackupToDoesNotUseWriteConnection(t *testing.T) {
+	t.Parallel()
+
+	// Si la usara, se quedaría esperando: el plazo lo convierte en un fallo.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	d := openDB(t)
+	dst := filepath.Join(t.TempDir(), "copia.db")
+	err := d.WriteTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`INSERT INTO meta(key, value) VALUES ('x', 'sin confirmar')`); err != nil {
+			return err
+		}
+		return d.BackupTo(ctx, dst)
+	})
+	if err != nil {
+		t.Fatalf("BackupTo dentro de una escritura: %v", err)
 	}
 }

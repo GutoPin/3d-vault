@@ -194,6 +194,16 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | La actividad muestra solo acciones de proyectos y archivos, en español; los archivos borrados sin enlace | Las cuentas y tokens son ruido y en parte privados. El texto sale de `vault.describeActivity`, junto a donde se escribe el `detail` |
 | Actividad paginada con `before=<id>`, 50 por página, sin índices nuevos | Se añaden si se vuelve lenta |
 | La búsqueda global ignora mayúsculas y acentos, filtrando en Go, máximo 100 resultados | Un modelador escribe "camion" para "Camión". `LIKE '%x%'` también recorre toda la tabla, así que filtrar en Go no cuesta más |
+| `serve` hace una copia diaria si hay `BACKUP_DIR`, a la hora `BACKUP_HOUR` (por defecto 3, hora de `TZ`), con la misma función que el comando `backup` | Sin crontab. Las copias manuales también se ven en Espacio |
+| La base de la copia se escribe con nombre temporal y reemplaza `vault.db` solo al final | Antes, una copia que fallaba a medias (disco lleno) dejaba una base que apuntaba a trozos no copiados y se perdía la copia anterior |
+| Solo se guarda la última copia, sin `BACKUP_KEEP` | Los trozos nunca se borran de la copia, así que crece sola. Varias copias por fecha corresponden a la máquina que la trae fuera del VPS |
+| `VACUUM INTO` con su propia conexión de solo lectura | Dentro de `serve`, usar la conexión de escritura detendría las subidas durante toda la copia |
+| Estado de la copia (última correcta, duración, último error) en `DATA_DIR/ultima-copia.json` | Sobrevive a reinicios y cubre también las copias manuales |
+| Aviso de disco a los admins por debajo del 15 % o de 20 GB libres, con caché de un minuto | `FreeBytes` pasa a `DiskSpace` para saber el tamaño total |
+| Bloqueos en su propia página, `/admin/locks`, y no dentro de Espacio | Liberar un bloqueo olvidado es frecuente; Espacio se visita poco |
+| `.zip` del proyecto o de una carpeta, método Store, en streaming trozo a trozo | Los `.blend` pesan GB. Si un trozo falla, se corta la conexión, como al descargar una versión |
+| Miniatura de cada versión en el historial, ampliable con `popover` nativo | Sin JavaScript, compatible con la CSP. Las que faltan se generan una vez |
+| Una sola constante de antigüedad de bloqueo (48 h) para Mi cuenta y Bloqueos | Los dos agentes la definieron por separado con el mismo valor |
 | Modo oscuro que sigue la preferencia del sistema, redefiniendo los tokens de color | Toda la interfaz usa variables. Sin interruptor propio: el sistema ya lo tiene. Revisado con capturas de Mi carpeta y de la ficha con visor |
 | Buscador y "Solo lo que necesita algo de mí" en Mi carpeta, en el navegador | Filtra las filas que ya están en memoria |
 | Subir desde la ficha o el proyecto con `pushFile`, compartida con Mi carpeta | Sirve en cualquier navegador. Usa la identidad de Mi carpeta solo si el bloqueo es de ella; si no, la de la web, igual que los botones de esa página |

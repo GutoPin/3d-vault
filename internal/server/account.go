@@ -4,14 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"3d-vault/internal/rules"
 	"3d-vault/internal/vault"
 )
-
-// staleLock es la antigüedad a partir de la cual Mi cuenta destaca un bloqueo.
-const staleLock = 48 * time.Hour
 
 // assetRow es un archivo con el nombre de su proyecto, para listas que mezclan
 // proyectos.

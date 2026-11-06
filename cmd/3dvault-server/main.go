@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	_ "time/tzdata" // La imagen no incluye zonas horarias y la variable TZ las necesita.
@@ -33,7 +34,8 @@ import (
 const usage = `Uso: 3dvault-server [comando]
 
 Comandos:
-  serve                       inicia el servidor (por defecto)
+  serve                       inicia el servidor (por defecto). Con BACKUP_DIR, hace
+                              además una copia cada día a la hora BACKUP_HOUR (3)
   create-admin                crea una cuenta de administrador
   backup --to RUTA            copia la base y los trozos, con el servidor en marcha
   restore --from RUTA         restaura una copia, con el servidor detenido
@@ -98,6 +100,9 @@ type config struct {
 	allowedIPs      []netip.Prefix
 	trustedProxies  []netip.Prefix
 	insecureCookies bool
+	// backupDir activa la copia diaria a la hora backupHour. Vacío la desactiva.
+	backupDir  string
+	backupHour int
 }
 
 const minSecretKey = 32
@@ -141,6 +146,15 @@ func loadConfig() (config, error) {
 		return config{}, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 	cfg.insecureCookies = os.Getenv("INSECURE_COOKIES") == "true"
+
+	cfg.backupDir, cfg.backupHour = os.Getenv("BACKUP_DIR"), 3
+	if raw := os.Getenv("BACKUP_HOUR"); raw != "" {
+		hour, err := strconv.Atoi(raw)
+		if err != nil || hour < 0 || hour > 23 {
+			return config{}, errors.New("BACKUP_HOUR debe ser una hora entre 0 y 23")
+		}
+		cfg.backupHour = hour
+	}
 	return cfg, nil
 }
 
@@ -255,9 +269,21 @@ func serve(ctx context.Context) error {
 		AllowedIPs:      cfg.allowedIPs,
 		TrustedProxies:  cfg.trustedProxies,
 		InsecureCookies: cfg.insecureCookies,
+		Backups: server.BackupConfig{
+			Dir:        cfg.backupDir,
+			Hour:       cfg.backupHour,
+			StatusFile: filepath.Join(cfg.dataDir, maintenance.StatusFile),
+		},
 	})
 	if err != nil {
 		return err
+	}
+
+	if cfg.backupDir != "" {
+		var backups sync.WaitGroup
+		// Antes de cerrar la base y el almacén, que la copia en curso usa.
+		defer backups.Wait()
+		backups.Go(func() { autoBackup(ctx, logger, database, chunks, cfg) })
 	}
 
 	// Cancelar este contexto corta las conexiones SSE, que nunca terminan solas.
@@ -298,6 +324,29 @@ func serve(ctx context.Context) error {
 		return fmt.Errorf("el servidor se detuvo: %w", err)
 	}
 	return nil
+}
+
+// autoBackup hace una copia cada día a la hora configurada, hasta que se detenga
+// el servidor. Es la misma que el comando backup.
+// ponytail: si el servidor estaba apagado a esa hora, espera al día siguiente.
+func autoBackup(ctx context.Context, logger *slog.Logger, database *db.DB, chunks *store.Store, cfg config) {
+	statusFile := filepath.Join(cfg.dataDir, maintenance.StatusFile)
+	for {
+		next := maintenance.NextBackup(time.Now(), cfg.backupHour)
+		logger.InfoContext(ctx, "próxima copia de seguridad", slog.Time("hora", next), slog.String("carpeta", cfg.backupDir))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Until(next)):
+		}
+		stats, took, err := maintenance.RecordedBackup(ctx, database, chunks, cfg.backupDir, statusFile)
+		if err != nil {
+			logger.ErrorContext(ctx, "la copia de seguridad falló", slog.Duration("duración", took), slog.Any("error", err))
+			continue
+		}
+		logger.InfoContext(ctx, "copia de seguridad terminada", slog.Duration("duración", took),
+			slog.Int("trozos copiados", stats.Copied), slog.Int("trozos que ya estaban", stats.Skipped))
+	}
 }
 
 func createAdmin(ctx context.Context, args []string) error {
@@ -347,11 +396,11 @@ func backup(ctx context.Context, args []string) error {
 	defer database.Close()
 	defer chunks.Close()
 
-	stats, err := maintenance.Backup(ctx, database, chunks, *to)
+	stats, took, err := maintenance.RecordedBackup(ctx, database, chunks, *to, filepath.Join(dataDir(), maintenance.StatusFile))
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Copia terminada en %s: %d trozos copiados, %d ya estaban.\n", *to, stats.Copied, stats.Skipped)
+	fmt.Printf("Copia terminada en %s en %s: %d trozos copiados, %d ya estaban.\n", *to, took.Round(time.Second), stats.Copied, stats.Skipped)
 	return nil
 }
 

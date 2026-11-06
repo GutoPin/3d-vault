@@ -24,7 +24,8 @@ sudo docker compose exec -it server 3dvault-server create-admin --username admin
 
 - **Usuarios** (menú Administración): crear cuentas, desactivarlas y cambiar contraseñas. Cambiar una contraseña cierra las sesiones de esa persona.
 - **Proyectos:** cualquiera puede crearlos desde **Todos los proyectos**. El nombre del proyecto es el nombre de su carpeta en cada PC.
-- **Desbloqueo forzado:** en la ficha de un archivo bloqueado, el admin ve **Forzar desbloqueo**. Úsalo solo si la persona no puede liberarlo; si tenía cambios sin subir, quedan solo en su PC.
+- **Desbloqueo forzado:** la página **Bloqueos** (menú Administración) lista los bloqueos de todos los proyectos, con persona, PC y desde cuándo; los de más de 2 días aparecen destacados. **Forzar desbloqueo** está ahí y en la ficha del archivo, y queda registrado. Úsalo solo si la persona no puede liberarlo; si tenía cambios sin subir, quedan solo en su PC.
+- **Descargar un proyecto:** en la página del proyecto, **Descargar todo (.zip)** baja la última versión de cada archivo con sus carpetas; cada carpeta tiene su propio **Descargar .zip**. El .zip va sin comprimir y se arma mientras baja, así que el navegador no muestra el tamaño total.
 
 ## Sesiones
 
@@ -54,17 +55,21 @@ El servidor lo entrega en `/blender/3dvault.zip`, siempre en la versión que cor
 
 ## Copias de seguridad
 
+**El servidor hace una copia cada día** en `BACKUP_DIR` (en Docker, `/backup`, que es la carpeta `BACKUP_PATH` del `.env`), a la hora `BACKUP_HOUR` (por defecto las 3, en la zona horaria `TZ`). Con `BACKUP_DIR` vacío no hay copias automáticas. La página **Espacio** muestra la última copia correcta, cuánto tardó, la próxima y, si la última falló, el motivo. El registro del servidor (`sudo docker compose logs server`) también lo anota.
+
+Copia primero la base de datos (`VACUUM INTO`) y después los trozos, con el servidor en marcha y sin frenar las subidas. Sobre la copia del día anterior es incremental: solo copia los trozos nuevos y reemplaza la base al final. Si una copia falla a medias, por ejemplo por falta de espacio, la anterior sigue completa.
+
+**Se conserva solo la última copia.** Los trozos nunca se borran de la carpeta de copias, ni siquiera después de `gc`, así que crece con el tiempo. Para empezarla de cero, borra la carpeta después de un `gc`: la siguiente copia será completa. Si quieres varias copias de días distintos, guárdalas en la máquina a la que la traes (ver abajo).
+
+También se puede hacer a mano, por ejemplo antes de purgar:
+
 ```sh
 sudo docker compose exec -T server 3dvault-server backup --to /backup
 ```
 
-Copia primero la base de datos (`VACUUM INTO`) y después los trozos, con el servidor en marcha. `/backup` es la carpeta `BACKUP_PATH` del `.env`. Programarla cada noche con `sudo crontab -e`:
+Si ya la tenías en el crontab, quita esa línea: hace lo mismo que la copia automática.
 
-```text
-0 3 * * * cd /home/USUARIO/3d-vault/deploy && docker compose exec -T server 3dvault-server backup --to /backup
-```
-
-**Una copia dentro del VPS no sirve si se pierde el VPS.** Tráela a otra máquina, por ejemplo cada noche desde la oficina:
+**Una copia dentro del VPS no sirve si se pierde el VPS.** Tráela a otra máquina, por ejemplo cada noche desde la oficina, después de la hora de la copia:
 
 ```sh
 rsync -a --rsync-path="sudo rsync" USUARIO@IP_DEL_VPS:/srv/3d-vault-backup/ ~/copias-3d-vault/
@@ -85,7 +90,7 @@ sudo docker compose up -d server
 
 ## Espacio en disco
 
-La página **Espacio** (menú Administración) muestra lo guardado, lo libre y el uso por proyecto.
+La página **Espacio** (menú Administración) muestra lo guardado, lo libre y el uso por proyecto. Si al disco le queda menos del 15 % o menos de 20 GB libres, los administradores ven un aviso en todas las páginas.
 
 Cada versión solo guarda los trozos que cambiaron, pero con archivos de 1 a 3 GB el disco se llena. Para liberar espacio, con el servidor detenido y después de una copia:
 

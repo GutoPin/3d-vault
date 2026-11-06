@@ -1,0 +1,45 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <h1>Bloqueos</h1>
+    <p class="sub">Archivos bloqueados en todos los proyectos, del más antiguo al más reciente.</p>
+  </div>
+</div>
+
+<div class="panel table-panel">
+  {{if .Data.Rows}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Archivo</th><th>Persona</th><th>PC</th><th>Desde</th><th></th></tr></thead>
+      <tbody>
+      {{range .Data.Rows}}
+        <tr>
+          <td><a class="name path" href="/assets/{{.Asset.ID}}">{{.Asset.Path}}</a><span class="sub">{{.Project}}</span></td>
+          <td>{{.Asset.Lock.DisplayName}}</td>
+          <td data-label="En">{{.Asset.Lock.ClientName}}</td>
+          <td data-label="Desde">{{when .Asset.Lock.LockedAt}}{{if .Days}} <span class="pill warn">Hace {{.Days}} días</span>{{end}}</td>
+          <td class="row-actions">
+            <form method="post" action="/admin/locks/{{.Asset.ID}}/unlock">
+              {{if eq .Asset.Lock.UserID $.User.ID}}<button class="text-action" type="submit">Liberar</button>
+              {{else}}<button class="text-action" type="submit" title="{{.Asset.Lock.DisplayName}} podría tener cambios sin subir">Forzar desbloqueo</button>{{end}}
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">No hay ningún archivo bloqueado.</p>
+  {{end}}
+</div>
+
+<section class="settings-row">
+  <div>
+    <h2>Antes de forzar</h2>
+  </div>
+  <div>
+    <p>Pide primero a la persona que libere el archivo. Si tenía cambios sin subir, siguen en su PC: para subirlos tendrá que volver a bloquear el archivo. Los desbloqueos forzados quedan registrados en la actividad.</p>
+  </div>
+</section>
+{{end}}

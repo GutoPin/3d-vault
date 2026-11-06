@@ -118,6 +118,11 @@ Para evitarlo: **bloquea siempre antes de editar**.
 
 Pulsa el nombre de un archivo para abrir su ficha. Ahí ves la miniatura de los `.blend` (si se guardaron con vista previa), las imágenes, y los `.glb`, `.gltf`, `.fbx`, `.obj` y `.stl` en 3D: arrastra para girar, rueda para acercar y **Encuadrar** para volver a la vista inicial. También está el historial con quién subió cada versión, cuándo, su comentario y cuánto cambió. Puedes **Descargar** cualquier versión o **Restaurarla**, lo que crea una versión nueva igual a la antigua, sin borrar nada.
 
+## Descargar y comparar desde la web
+
+- En la página de un proyecto, **Descargar todo (.zip)** baja la última versión de cada archivo con sus carpetas, por ejemplo para entregar a un cliente. Cada carpeta tiene su propio **Descargar .zip**.
+- En el historial de un `.blend`, cada versión muestra su miniatura: púlsala para verla grande y comparar.
+
 ## Mi cuenta, actividad y búsqueda
 
 - **Mi cuenta** (tu nombre, abajo a la izquierda): cambia tu contraseña la primera vez que entres. También ves tus **conexiones de Blender** (puedes revocar la de una PC que ya no uses) y **todos tus bloqueos**, de todos los proyectos, con un botón para liberarlos. Al cambiar la contraseña, Blender deja de estar conectado: genera un código nuevo en Mi carpeta.

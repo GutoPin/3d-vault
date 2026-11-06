@@ -717,6 +717,7 @@ type ProjectStorage struct {
 type StorageUsage struct {
 	StoredBytes int64
 	FreeBytes   int64
+	DiskBytes   int64
 	FreeKnown   bool
 	Assets      int
 	Versions    int
@@ -726,8 +727,8 @@ type StorageUsage struct {
 // StorageUsage calcula el uso de disco total y por proyecto.
 func (s *Service) StorageUsage(ctx context.Context) (StorageUsage, error) {
 	var usage StorageUsage
-	free, err := s.store.FreeBytes()
-	usage.FreeBytes, usage.FreeKnown = free, err == nil
+	free, total, err := s.DiskSpace()
+	usage.FreeBytes, usage.DiskBytes, usage.FreeKnown = free, total, err == nil
 
 	err = s.db.ReadTx(ctx, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(stored_size), 0) FROM chunks`).Scan(&usage.StoredBytes); err != nil {

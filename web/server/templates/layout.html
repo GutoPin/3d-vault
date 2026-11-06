@@ -33,6 +33,7 @@
     {{end}}
     {{if .User.IsAdmin}}<div class="group-label">Administración</div>
     <a class="nav-item" href="/admin/users"{{if eq .Active "users"}} aria-current="page"{{end}}>Usuarios</a>
+    <a class="nav-item" href="/admin/locks"{{if eq .Active "locks"}} aria-current="page"{{end}}>Bloqueos</a>
     <a class="nav-item" href="/admin/storage"{{if eq .Active "storage"}} aria-current="page"{{end}}>Espacio</a>{{end}}
     <div class="bottom user-row">
       <a class="who" href="/account"{{if eq .Active "account"}} aria-current="page"{{end}}>{{.User.DisplayName}}<span>Mi cuenta</span></a>
@@ -40,6 +41,7 @@
     </div>
   </nav>
   <main class="canvas">
+    {{with .DiskAlert}}<p class="disk-alert" role="status">Queda poco espacio en el disco del servidor: {{formatBytes .Free}} libres ({{formatPercent .Percent}}). <a href="/admin/storage">Ver Espacio</a></p>{{end}}
     {{if .Error}}<p class="notice" role="alert">{{.Error}}</p>{{end}}
     {{template "content" .}}
   </main>

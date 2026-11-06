@@ -36,12 +36,25 @@ type BackupStats struct {
 // marcha. El orden importa: una fila de trozo solo existe cuando sus datos ya están
 // en disco, así que todo lo que referencia esta copia de la base existe al copiar
 // los trozos. Al revés, la copia podría referenciar trozos que no se copiaron.
-// Nunca borra nada en el destino.
+//
+// Sobre una copia anterior es incremental: solo copia los trozos nuevos. La base
+// nueva reemplaza a la anterior al final, así que si la copia falla a medias, por
+// ejemplo por falta de espacio, la carpeta conserva la copia anterior completa.
+// Nunca borra trozos en el destino.
 func Backup(ctx context.Context, database *db.DB, chunks *store.Store, dir string) (BackupStats, error) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return BackupStats{}, fmt.Errorf("crear la carpeta de copia: %w", err)
 	}
-	if err := database.BackupTo(ctx, filepath.Join(dir, DatabaseFile)); err != nil {
+	// Un nombre único: dos copias a la vez en la misma carpeta no se pisan.
+	// ponytail: si el proceso muere aquí, queda un vault.db.nueva-* que se borra a mano.
+	tmp, err := os.CreateTemp(dir, DatabaseFile+".nueva-*")
+	if err != nil {
+		return BackupStats{}, fmt.Errorf("crear la copia de la base: %w", err)
+	}
+	_ = tmp.Close()
+	newDB := tmp.Name()
+	defer os.Remove(newDB) // Ya no existe si la copia terminó bien.
+	if err := database.BackupTo(ctx, newDB); err != nil {
 		return BackupStats{}, err
 	}
 
@@ -54,6 +67,9 @@ func Backup(ctx context.Context, database *db.DB, chunks *store.Store, dir strin
 	stats, err := chunks.CopyMissingTo(ctx, dst)
 	if err != nil {
 		return BackupStats{}, fmt.Errorf("copiar los trozos: %w", err)
+	}
+	if err := os.Rename(newDB, filepath.Join(dir, DatabaseFile)); err != nil {
+		return BackupStats{}, fmt.Errorf("mover la copia de la base: %w", err)
 	}
 	return BackupStats{Copied: stats.Copied, Skipped: stats.Skipped}, nil
 }

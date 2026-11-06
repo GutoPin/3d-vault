@@ -44,7 +44,7 @@ func loadPages() (*pageSet, error) {
 		"when":          func(t time.Time) string { return formatWhen(t, time.Now()) },
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -102,7 +102,9 @@ type pageData struct {
 	Active        string
 	ActiveProject int64
 	Error         string
-	Data          any
+	// DiskAlert avisa a los admins de que queda poco disco.
+	DiskAlert *diskAlert
+	Data      any
 }
 
 // render ejecuta la plantilla en memoria para no enviar una página a medias.
@@ -115,6 +117,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, name
 			return
 		}
 		page.Projects = projects
+		if user.IsAdmin {
+			page.DiskAlert = s.diskAlert()
+		}
 	}
 
 	var buf bytes.Buffer
@@ -197,6 +202,7 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Get("/blender/version", s.blenderVersion)
 		r.Post("/projects", s.webCreateProject)
 		r.Get("/projects/{id}", s.webProject)
+		r.Get("/projects/{id}/download.zip", s.webProjectZip)
 		r.Get("/assets/{id}", s.webAsset)
 		r.Post("/assets/{id}/lock", s.webLock)
 		r.Post("/assets/{id}/unlock", s.webUnlock)
@@ -213,6 +219,8 @@ func (s *Server) webRoutes(r chi.Router) {
 			r.Post("/admin/users/{id}/active", s.webSetActive)
 			r.Post("/admin/users/password", s.webSetPassword)
 			r.Get("/admin/storage", s.webStorage)
+			r.Get("/admin/locks", s.webLocks)
+			r.Post("/admin/locks/{id}/unlock", s.webForceUnlock)
 		})
 	})
 }
@@ -374,6 +382,8 @@ type treeRow struct {
 	Name   string
 	Depth  int
 	Asset  vault.Asset
+	// Prefix es la ruta de una carpeta, para descargarla.
+	Prefix string
 }
 
 type projectData struct {
@@ -384,6 +394,7 @@ type projectData struct {
 	Query        string
 	Rows         []treeRow
 	EmptyMessage string
+	HasFiles     bool
 }
 
 func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
@@ -468,6 +479,7 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 		Query: query,
 		Rows:  buildTree(shown),
 	}
+	data.HasFiles = len(snap.Assets) > 0
 	switch {
 	case len(snap.Assets) == 0:
 		data.EmptyMessage = "Este proyecto aún no tiene archivos. Los modeladores los agregan desde su carpeta sincronizada."
@@ -506,7 +518,7 @@ func buildTree(assets []vault.Asset) []treeRow {
 			common++
 		}
 		for i := common; i < len(dirs); i++ {
-			rows = append(rows, treeRow{Folder: true, Name: dirs[i], Depth: min(i, maxTreeDepth)})
+			rows = append(rows, treeRow{Folder: true, Name: dirs[i], Depth: min(i, maxTreeDepth), Prefix: strings.Join(dirs[:i+1], "/") + "/"})
 		}
 		current = dirs
 		rows = append(rows, treeRow{Name: name, Depth: min(len(dirs), maxTreeDepth), Asset: asset})
@@ -523,6 +535,8 @@ type assetData struct {
 	CanRelease  bool
 	CanForce    bool
 	Preview     *preview
+	// Thumbs es la miniatura de cada versión del historial, por id de versión.
+	Thumbs map[int64]string
 	// Requested confirma que se pidió liberar el archivo.
 	Requested bool
 }
@@ -564,6 +578,7 @@ func (s *Server) renderAsset(w http.ResponseWriter, r *http.Request, status int,
 		CanRelease:  asset.Lock != nil && asset.Lock.UserID == user.ID,
 		CanForce:    asset.Lock != nil && asset.Lock.UserID != user.ID && user.IsAdmin,
 		Preview:     s.assetPreview(r.Context(), asset),
+		Thumbs:      s.historyThumbs(r.Context(), asset, versions),
 	}
 	s.render(w, r, status, "asset", pageData{Title: data.FileName, ActiveProject: asset.ProjectID, Error: errorMessage, Data: data})
 }

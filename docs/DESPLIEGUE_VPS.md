@@ -105,21 +105,23 @@ cd ~/3d-vault/deploy
 sudo docker compose exec server 3dvault-server check
 ```
 
-## 9. Activa las copias de seguridad
+## 9. Comprueba las copias de seguridad
 
-Primero haz una copia manual:
+El servidor ya hace una copia cada noche en `/srv/3d-vault-backup`, a la hora `BACKUP_HOUR` del `.env` (las 3 por defecto, en tu `TZ`). No hace falta crontab. Haz ahora la primera, a mano, para no esperar a la noche:
 
 ```sh
 sudo docker compose exec -T server 3dvault-server backup --to /backup
 ```
 
-Para que corra todas las noches, añade esto con `sudo crontab -e`:
+En **Espacio** verás la última copia correcta y la próxima. Si una falla, ahí aparece el motivo.
+
+Opcional: si prefieres programarla tú, deja `BACKUP_DIR=` vacío en `.env` y añade esto con `sudo crontab -e`:
 
 ```text
 0 3 * * * cd /home/USUARIO/3d-vault/deploy && docker compose exec -T server 3dvault-server backup --to /backup
 ```
 
-Esa copia sigue dentro del VPS. Para que sobreviva si lo pierdes, tráela desde otra máquina (necesitas `rsync` en ambas):
+Esa copia sigue dentro del VPS y en el mismo disco, así que también ocupa espacio en él. Para que sobreviva si lo pierdes, tráela cada día desde otra máquina, después de la hora de la copia (necesitas `rsync` en ambas):
 
 ```sh
 rsync -a --rsync-path="sudo rsync" USUARIO@IP_DEL_VPS:/srv/3d-vault-backup/ ~/copias-3d-vault/

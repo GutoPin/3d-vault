@@ -322,3 +322,116 @@ func TestLockDataDirIsExclusive(t *testing.T) {
 	}
 	_ = again.Close()
 }
+
+// TestRecordedBackupIsRestorable es la copia automática: la función que llama el
+// servidor cada día deja una copia que se restaura y verifica.
+func TestRecordedBackupIsRestorable(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	f := newFixture(t)
+	backupDir := t.TempDir()
+	statusPath := filepath.Join(f.dir, StatusFile)
+
+	stats, _, err := RecordedBackup(ctx, f.database, f.chunks, backupDir, statusPath)
+	if err != nil {
+		t.Fatalf("RecordedBackup: %v", err)
+	}
+	status, err := ReadBackupStatus(statusPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.LastOK.IsZero() || status.Dir != backupDir || status.Copied != stats.Copied || status.Failing() {
+		t.Fatalf("estado = %+v", status)
+	}
+
+	restored := t.TempDir()
+	if _, err := Restore(ctx, backupDir, restored, false, time.Now()); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	database, chunks, svc := openData(t, restored)
+	report, err := Check(ctx, database, chunks)
+	if err != nil || !report.OK() || report.Checked == 0 {
+		t.Fatalf("Check = %+v, %v", report, err)
+	}
+	if got := readVersion(t, svc, f.result.Version.ID); !bytes.Equal(got, f.data) {
+		t.Fatal("el contenido restaurado no coincide")
+	}
+}
+
+// Una copia que falla a medias no estropea la anterior y queda registrada.
+func TestFailedBackupKeepsPreviousCopy(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	f := newFixture(t)
+	backupDir := t.TempDir()
+	statusPath := filepath.Join(f.dir, StatusFile)
+	if _, _, err := RecordedBackup(ctx, f.database, f.chunks, backupDir, statusPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// Un archivo nuevo con un trozo dañado en el origen: la copia falla al copiarlo,
+	// después de haber copiado la base.
+	m := upload(t, f.svc, bytes.Repeat([]byte("versión nueva "), 100_000))
+	if _, err := f.svc.CreateAsset(ctx, f.actor, vault.CreateAssetInput{ProjectID: f.project.ID, Path: "b.blend", Manifest: m, Comment: "Nueva"}); err != nil {
+		t.Fatal(err)
+	}
+	name := m.Chunks[0].SHA256.String()
+	if err := os.WriteFile(filepath.Join(f.dir, ChunksDir, name[:2], name[2:4], name), nil, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := RecordedBackup(ctx, f.database, f.chunks, backupDir, statusPath); err == nil {
+		t.Fatal("la copia debería fallar")
+	}
+	status, err := ReadBackupStatus(statusPath)
+	if err != nil || !status.Failing() || status.LastError == "" || status.LastOK.IsZero() {
+		t.Fatalf("estado = %+v, %v", status, err)
+	}
+	if leftovers, _ := filepath.Glob(filepath.Join(backupDir, DatabaseFile+".*")); len(leftovers) != 0 {
+		t.Errorf("quedaron temporales: %v", leftovers)
+	}
+
+	restored := t.TempDir()
+	if _, err := Restore(ctx, backupDir, restored, false, time.Now()); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	database, chunks, svc := openData(t, restored)
+	if report, err := Check(ctx, database, chunks); err != nil || !report.OK() {
+		t.Fatalf("la copia anterior debe seguir sana: %+v, %v", report, err)
+	}
+	snap, err := svc.GetSnapshot(ctx, f.project.ID)
+	if err != nil || len(snap.Assets) != 1 {
+		t.Fatalf("la copia debe ser la anterior: %+v, %v", snap.Assets, err)
+	}
+}
+
+func TestNextBackup(t *testing.T) {
+	t.Parallel()
+
+	madrid, err := time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		t.Skip("sin zonas horarias:", err)
+	}
+	at := func(day, hour, minute int) time.Time { return time.Date(2026, 3, day, hour, minute, 0, 0, madrid) }
+	for _, tt := range []struct {
+		now  time.Time
+		hour int
+		want time.Time
+	}{
+		{at(10, 2, 59), 3, at(10, 3, 0)},
+		{at(10, 3, 0), 3, at(11, 3, 0)},
+		{at(10, 23, 30), 3, at(11, 3, 0)},
+		{at(10, 23, 30), 0, at(11, 0, 0)},
+		{at(31, 12, 0), 23, at(31, 23, 0)},
+		{at(28, 22, 0), 3, at(29, 3, 0)},
+	} {
+		if got := NextBackup(tt.now, tt.hour); !got.Equal(tt.want) {
+			t.Errorf("NextBackup(%v, %d) = %v, quiero %v", tt.now, tt.hour, got, tt.want)
+		}
+	}
+	// La noche del cambio de hora solo pasan 4 horas de 22:00 a 03:00.
+	if got := NextBackup(at(28, 22, 0), 3).Sub(at(28, 22, 0)); got != 4*time.Hour {
+		t.Errorf("con cambio de hora = %v, quiero 4h", got)
+	}
+}

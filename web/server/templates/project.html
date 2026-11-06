@@ -5,6 +5,10 @@
     <h1 class="path">{{.Data.Project.Name}}</h1>
     <p class="sub">{{.Data.Summary}}</p>
   </div>
+  <div class="actions">
+    <a class="btn" href="/activity?project={{.Data.Project.ID}}">Actividad</a>
+    {{if .Data.HasFiles}}<a class="btn" href="/projects/{{.Data.Project.ID}}/download.zip" title="La última versión de cada archivo, con sus carpetas">Descargar todo (.zip)</a>{{end}}
+  </div>
 </div>
 
 <div id="asset-list">
@@ -29,7 +33,7 @@
           <tbody>
           {{range .Data.Rows}}
             {{if .Folder}}
-            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}">{{.Name}}/</span></td></tr>
+            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> <a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a></span></td></tr>
             {{else}}
             <tr>
               <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a></span></td>

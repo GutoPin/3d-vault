@@ -44,6 +44,31 @@ func (s *Service) Thumbnail(ctx context.Context, versionID int64) ([]byte, error
 	return data, err
 }
 
+// HasThumbnail indica si una versión de un .blend tiene miniatura. Si aún no se
+// sabe, la genera; solo entonces lee el manifiesto, que en un archivo grande
+// tiene miles de trozos.
+func (s *Service) HasThumbnail(ctx context.Context, v Version) (bool, error) {
+	if s.thumbs == nil {
+		return false, nil
+	}
+	_, err := s.thumbs.Get(v.FileSHA256)
+	if errors.Is(err, fs.ErrNotExist) {
+		var m manifest.Manifest
+		err = s.db.ReadTx(ctx, func(tx *sql.Tx) error {
+			var err error
+			m, err = loadManifest(ctx, tx, v.manifestID)
+			return err
+		})
+		if err == nil {
+			_, err = s.generateThumbnail(ctx, v.FileSHA256, m)
+		}
+	}
+	if errors.Is(err, thumbs.ErrNoThumbnail) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // WaitBackground espera a que terminen las miniaturas en curso. Se llama al
 // detener el servidor, antes de cerrar el almacén.
 func (s *Service) WaitBackground() {

@@ -67,9 +67,12 @@
     <table class="stack-table">
       <thead><tr><th>Versión</th><th>Comentario</th><th>Autor</th><th class="n">Fecha</th><th class="n">Tamaño</th><th>Cambió respecto a la anterior</th><th></th></tr></thead>
       <tbody>
-      {{range .Data.Versions}}
+      {{range $v := .Data.Versions}}
         <tr>
-          <td><span class="version-no{{if eq .Number $asset.HeadVersion}} version-current{{end}}">v{{.Number}}</span></td>
+          <td><div class="version-cell"><span class="version-no{{if eq .Number $asset.HeadVersion}} version-current{{end}}">v{{.Number}}</span>
+            {{with index $.Data.Thumbs .ID}}<button class="history-thumb" type="button" popovertarget="vista-v{{$v.Number}}" aria-label="Ver v{{$v.Number}} en grande"><img src="{{.}}" alt="" width="40" height="40" loading="lazy"></button>
+            <div class="history-big" id="vista-v{{$v.Number}}" popover><img src="{{.}}" alt="Vista previa de v{{$v.Number}}" loading="lazy"><button class="btn" type="button" popovertarget="vista-v{{$v.Number}}" popovertargetaction="hide">Cerrar</button></div>{{end}}
+          </div></td>
           <td class="comment">{{.Comment}}</td>
           <td>{{.UploadedBy}}</td>
           <td class="n">{{when .CreatedAt}}</td>

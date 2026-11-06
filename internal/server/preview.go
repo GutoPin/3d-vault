@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 
 	"3d-vault/internal/rules"
@@ -105,4 +106,33 @@ func (s *Server) webImage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", immutableCache)
 	s.sendVersion(w, r, file, contentType, "inline")
+}
+
+// maxHistoryImage limita las imágenes del historial, porque su miniatura es la
+// imagen entera. ponytail: sin reducirlas en el servidor; hacerlo si pesan.
+const maxHistoryImage = 20 << 20
+
+// historyThumbs elige la miniatura de cada versión del historial, por id: la que
+// guardó Blender en un .blend, o la propia imagen. Sin miniatura, no hay entrada.
+func (s *Server) historyThumbs(ctx context.Context, asset vault.Asset, versions []vault.VersionDetail) map[int64]string {
+	thumbs := make(map[int64]string)
+	for _, v := range versions {
+		src := "/versions/" + strconv.FormatInt(v.ID, 10)
+		switch {
+		case asset.Ext == ".blend":
+			ok, err := s.svc.HasThumbnail(ctx, v.Version)
+			if ctx.Err() != nil {
+				return thumbs
+			}
+			if err != nil {
+				s.log.ErrorContext(ctx, "error al generar una miniatura", slog.Int64("versión", v.ID), slog.Any("error", err))
+			}
+			if ok {
+				thumbs[v.ID] = src + "/thumb"
+			}
+		case imageTypes[asset.Ext] != "" && v.SizeBytes <= maxHistoryImage:
+			thumbs[v.ID] = src + "/image"
+		}
+	}
+	return thumbs
 }

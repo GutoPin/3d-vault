@@ -127,6 +127,10 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | **Espacio** | Guardado, libre y uso por proyecto |
 | Detener el servidor (Ctrl+C) y ejecutar `./bin/3dvault-server purge --keep-last 1 --older-than 0d`, con `DATA_DIR=./data` | Solo simula: dice cuántas versiones quitaría. Con `--apply` las quita; luego `gc --apply` libera los trozos |
 | `./bin/3dvault-server check` | 0 corruptos, 0 faltantes |
+| **Bloqueos** (admin) | Todos los bloqueos, con "Hace N días" en los viejos. **Forzar desbloqueo** lo libera y queda en Actividad |
+| Proyecto → **Descargar todo (.zip)** y el **Descargar .zip** de una carpeta | El .zip abre en Windows con las carpetas y la última versión de cada archivo |
+| Historial de `camion.blend` | Miniatura en cada versión; al pulsarla se ve grande |
+| Arrancar el servidor con `BACKUP_DIR=/tmp/copias BACKUP_HOUR=<la hora siguiente>` | A esa hora hace la copia; Espacio muestra la última copia correcta y cuánto tardó |
 | `./bin/3dvault-server backup --to /tmp/copia` y luego `restore` en otra carpeta | Restaura y `check` sale limpio |
 
 ## Errores posibles y qué significan

@@ -229,8 +229,16 @@ func (d *DB) RegenerateEpoch(ctx context.Context) error {
 }
 
 // BackupTo escribe una copia consistente de la base en dst, de forma atómica.
-// Puede ejecutarse con el servidor en marcha.
+// Puede ejecutarse con el servidor en marcha: usa una conexión propia, que solo
+// lee, así que no hace esperar a las escrituras. La de lectura no sirve porque es
+// query_only, y SQLite rechaza VACUUM INTO en ella.
 func (d *DB) BackupTo(ctx context.Context, dst string) (err error) {
+	conn, err := openPool(d.path, nil, 1)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
 	tmp := dst + ".tmp"
 	if err := os.Remove(tmp); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("borrar temporal anterior: %w", err)
@@ -244,7 +252,7 @@ func (d *DB) BackupTo(ctx context.Context, dst string) (err error) {
 	// security: VACUUM INTO no admite parámetros en todas las versiones; la ruta
 	// la da el administrador por línea de comandos y se escapa como literal SQL.
 	stmt := "VACUUM INTO '" + strings.ReplaceAll(tmp, "'", "''") + "'"
-	if _, err := d.write.ExecContext(ctx, stmt); err != nil {
+	if _, err := conn.ExecContext(ctx, stmt); err != nil {
 		return fmt.Errorf("copiar la base de datos: %w", err)
 	}
 

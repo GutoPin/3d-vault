@@ -134,7 +134,7 @@ func describeActivity(action, detail string, restoredFrom int64) (text, note str
 	case actionForceUnlock:
 		return "forzó el desbloqueo", detail
 	case actionRequestUnlock:
-		return "pidió que lo liberara " + detail, ""
+		return "pidió a " + detail + " que lo liberara", ""
 	}
 	return action, detail
 }

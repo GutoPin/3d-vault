@@ -1,5 +1,5 @@
 {{define "content"}}
-{{$u := .Data}}
+{{$u := .Data.Usage}}
 <div class="title-row">
   <div>
     <h1>Espacio</h1>
@@ -9,7 +9,7 @@
 
 <section class="facts" aria-label="Uso del disco">
   <div class="fact"><div class="label">Guardado en disco</div><div class="value lead">{{formatBytes $u.StoredBytes}}</div></div>
-  <div class="fact"><div class="label">Libre en el disco</div><div class="value">{{if $u.FreeKnown}}{{formatBytes $u.FreeBytes}}{{else}}No disponible{{end}}</div></div>
+  <div class="fact"><div class="label">Libre en el disco</div><div class="value">{{if $u.FreeKnown}}{{formatBytes $u.FreeBytes}}{{else}}No disponible{{end}}</div>{{if $u.FreeKnown}}<div class="note">{{formatPercent .Data.FreePercent}} de {{formatBytes $u.DiskBytes}}</div>{{end}}</div>
   <div class="fact"><div class="label">Archivos</div><div class="value">{{$u.Assets}}</div></div>
   <div class="fact"><div class="label">Versiones</div><div class="value">{{$u.Versions}}</div><div class="note">Incluye archivos borrados sin purgar</div></div>
 </section>
@@ -46,6 +46,25 @@
     <p>Un trozo que comparten varios proyectos cuenta en cada uno, así que la columna puede sumar más que el total guardado en disco.</p>
   </div>
 </section>
+
+{{with .Data.Backup}}
+<section class="settings-row" id="copias">
+  <div>
+    <h2>Copias de seguridad</h2>
+    <p>Una copia en el mismo VPS no sirve si se pierde el VPS: tráela también a otra máquina.</p>
+  </div>
+  <div>
+    {{if .Enabled}}<p>Cada día a las {{.Hour}}:00 en <code>{{.Dir}}</code>. Próxima: {{when .Next}}.</p>
+    {{else}}<p>Las copias automáticas están desactivadas. Para activarlas, define <code>BACKUP_DIR</code> en el <code>.env</code> del servidor.</p>{{end}}
+    {{if .Unreadable}}<p class="notice">No se pudo leer el resultado de las copias. Mira el registro del servidor.</p>
+    {{else}}{{with .Status}}
+      {{if .LastOK.IsZero}}<p>Todavía no se ha hecho ninguna copia.</p>
+      {{else}}<p>Última copia correcta: {{when .LastOK}}{{if ne .Dir $.Data.Backup.Dir}} en <code>{{.Dir}}</code>{{end}}. Tardó {{$.Data.Backup.Took}} y copió {{.Copied}} trozos nuevos.</p>{{end}}
+      {{if .Failing}}<p class="notice">La última copia falló ({{when .LastErrorAt}}): {{.LastError}}</p>{{end}}
+    {{end}}{{end}}
+  </div>
+</section>
+{{end}}
 
 <section class="settings-row">
   <div>
