@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build-server build-agent-windows build-measure check
+.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e
 
 # Limitado a 2 núcleos y prioridad baja: la máquina de desarrollo es modesta.
 LIMITS := GOMAXPROCS=2 nice -n 19
@@ -24,5 +24,13 @@ build-agent-windows:
 
 build-measure:
 	$(GOBUILD) -o bin/cdcmeasure ./cmd/cdcmeasure
+
+# Núcleo de la sincronización web (cortes idénticos a Go, SHA-256). Requiere Node.
+test-web:
+	node --test web/sync_test.mjs
+
+# Dos navegadores contra un servidor real. Requiere Node y Chromium (ver web/e2e).
+e2e: build-server
+	cd web/e2e && npm ci --silent && nice -n 19 node sync.e2e.mjs
 
 check: vet test

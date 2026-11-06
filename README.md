@@ -7,7 +7,12 @@ Sistema interno y autohospedado para guardar archivos 3D con historial de versio
 
 ## Estado
 
-**Fase 1, servidor núcleo: falta probar el despliegue con Docker y HTTPS.** Ya funcionan la API, la web, `3dvault-sync push/pull` y los backups. Todavía no hay agente con ícono en la bandeja: es la Fase 2. El detalle y los resultados están en `docs/DECISIONES.md`.
+**Fases 1 y 2 listas para el piloto, Fase 3 en parte; falta probar el despliegue con Docker y HTTPS en el VPS.**
+
+- **Fase 2, cambio de plan:** los modeladores sincronizan desde la web, en la página **Mi carpeta** (`/sync`) de Edge o Chrome. No se instala nada, así que Windows no tiene un `.exe` que bloquear. Probado de punta a punta con dos navegadores (`make e2e`).
+- **Fase 3:** `purge`, `gc` y la página Espacio para administrar el disco. El visor 3D y las miniaturas están en curso.
+
+Guías: [`docs/GUIA_USUARIO.md`](docs/GUIA_USUARIO.md) para modeladores y [`docs/ADMIN.md`](docs/ADMIN.md) para el administrador. El detalle y los resultados están en `docs/DECISIONES.md`.
 
 ## Desplegar
 
@@ -40,4 +45,6 @@ make build-measure
 ```sh
 make check                              # go vet y tests, con 2 núcleos y prioridad baja
 make test-race PKG=./internal/vault     # detector de carreras: pesado, mejor por paquete
+make test-web                           # núcleo de la sincronización web, con Node
+make e2e                                # dos navegadores contra un servidor real (Node y Chromium)
 ```

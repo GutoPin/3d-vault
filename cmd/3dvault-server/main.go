@@ -37,6 +37,13 @@ Comandos:
   backup --to RUTA            copia la base y los trozos, con el servidor en marcha
   restore --from RUTA         restaura una copia, con el servidor detenido
   check                       verifica el hash de todos los trozos
+  purge [--keep-last N] [--older-than EDAD] [--apply]
+                              borra versiones viejas y archivos borrados hace tiempo,
+                              con el servidor detenido. Conserva la versión actual,
+                              las N últimas (10) y las más nuevas que EDAD (180d).
+                              Sin --apply solo muestra lo que haría
+  gc [--apply]                borra los trozos que ya no usa ninguna versión, con el
+                              servidor detenido. Sin --apply solo muestra lo que haría
   healthcheck                 comprueba que el servidor responde
 `
 
@@ -66,6 +73,10 @@ func run(args []string) error {
 		return restore(ctx, args)
 	case "check":
 		return check(ctx)
+	case "purge":
+		return purge(ctx, args)
+	case "gc":
+		return gc(ctx, args)
 	case "healthcheck":
 		return healthcheck(ctx)
 	case "help", "-h", "--help":
@@ -381,6 +392,105 @@ func check(ctx context.Context) error {
 		return errors.New("hay trozos dañados: restaura una copia de seguridad")
 	}
 	return nil
+}
+
+// openLocked abre los datos con el servidor detenido, como piden purge y gc.
+func openLocked(ctx context.Context) (*db.DB, *store.Store, func(), error) {
+	dir := dataDir()
+	lock, err := maintenance.LockDataDir(dir)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	database, chunks, err := openData(ctx, dir)
+	if err != nil {
+		_ = lock.Close()
+		return nil, nil, nil, err
+	}
+	return database, chunks, func() {
+		_ = chunks.Close()
+		_ = database.Close()
+		_ = lock.Close()
+	}, nil
+}
+
+func purge(ctx context.Context, args []string) error {
+	flags := flag.NewFlagSet("purge", flag.ContinueOnError)
+	keepLast := flags.Int("keep-last", 10, "versiones más nuevas que se conservan siempre")
+	olderThan := flags.String("older-than", "180d", "solo borra lo más viejo que esto, en días (180d) u horas (12h)")
+	apply := flags.Bool("apply", false, "borra de verdad; sin esto solo simula")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *keepLast < 0 {
+		return errors.New("--keep-last no puede ser negativo")
+	}
+	age, err := parseAge(*olderThan)
+	if err != nil {
+		return err
+	}
+
+	// Purge solo toca la base: los trozos los borra gc.
+	database, _, closeAll, err := openLocked(ctx)
+	if err != nil {
+		return err
+	}
+	defer closeAll()
+
+	report, err := maintenance.Purge(ctx, database, *keepLast, time.Now().Add(-age), *apply)
+	if err != nil {
+		return err
+	}
+	verb := "Se quitarían"
+	if *apply {
+		verb = "Quitadas"
+	}
+	fmt.Printf("%s: %d versiones, %d archivos borrados y %d manifiestos.\n", verb, report.Versions, report.Files, report.Manifests)
+	fmt.Printf("Trozos sin usar después: %d, unos %s. Los borra gc --apply.\n", report.Chunks, gib(report.Bytes))
+	if !*apply {
+		fmt.Println("Es una simulación: no se ha cambiado nada. Repite con --apply para purgar.")
+	}
+	return nil
+}
+
+func gc(ctx context.Context, args []string) error {
+	flags := flag.NewFlagSet("gc", flag.ContinueOnError)
+	apply := flags.Bool("apply", false, "borra de verdad; sin esto solo simula")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	database, chunks, closeAll, err := openLocked(ctx)
+	if err != nil {
+		return err
+	}
+	defer closeAll()
+
+	report, err := maintenance.GC(ctx, database, chunks, *apply)
+	if err != nil {
+		return err
+	}
+	if *apply {
+		fmt.Printf("Trozos borrados: %d, %s liberados.\n", report.Chunks, gib(report.Bytes))
+		return nil
+	}
+	fmt.Printf("Trozos sin usar: %d, %s. Es una simulación: repite con --apply para borrarlos.\n", report.Chunks, gib(report.Bytes))
+	return nil
+}
+
+// parseAge acepta días ("180d") además de las duraciones de Go ("12h").
+func parseAge(text string) (time.Duration, error) {
+	if days, ok := strings.CutSuffix(text, "d"); ok {
+		n, err := strconv.Atoi(days)
+		if err == nil && n >= 0 {
+			return time.Duration(n) * 24 * time.Hour, nil
+		}
+	} else if d, err := time.ParseDuration(text); err == nil && d >= 0 {
+		return d, nil
+	}
+	return 0, fmt.Errorf("--older-than %q no es válido: usa días, como 180d", text)
+}
+
+func gib(n int64) string {
+	return fmt.Sprintf("%.2f GiB", float64(n)/(1<<30))
 }
 
 func healthcheck(ctx context.Context) error {

@@ -297,3 +297,24 @@ func (s *Store) copyFile(src, dst string) error {
 	}
 	return s.writeAtomic(dst, raw[0], raw[1:])
 }
+
+// StoredSize devuelve lo que ocupa un trozo en disco.
+func (s *Store) StoredSize(h chunker.Hash) (int64, error) {
+	info, err := os.Stat(s.path(h))
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("consultar trozo: %w", err)
+	}
+	return info.Size(), nil
+}
+
+// Remove borra un trozo del disco. Antes hay que borrar su fila en la base de
+// datos: si no, el servidor daría por guardado un trozo que ya no existe.
+func (s *Store) Remove(h chunker.Hash) error {
+	if err := os.Remove(s.path(h)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("borrar trozo: %w", err)
+	}
+	return nil
+}

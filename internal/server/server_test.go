@@ -893,7 +893,7 @@ func TestWebRequiresLogin(t *testing.T) {
 
 	e := newEnv(t)
 	b := e.newBrowser()
-	for _, path := range []string{"/", "/projects/1", "/assets/1", "/admin/users", "/versions/1/download"} {
+	for _, path := range []string{"/", "/sync", "/projects/1", "/assets/1", "/admin/users", "/versions/1/download"} {
 		resp, _ := b.get(path)
 		if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/login" {
 			t.Errorf("%s = %d, %s", path, resp.StatusCode, resp.Header.Get("Location"))
@@ -975,6 +975,9 @@ func TestWebProjectsAndTree(t *testing.T) {
 
 	resp, body := b.get("/")
 	wantPage(t, resp, body, http.StatusOK, "Todavía no hay proyectos", "0 proyectos")
+
+	resp, body = b.get("/sync")
+	wantPage(t, resp, body, http.StatusOK, "<h1>Mi carpeta</h1>", `src="/static/sync/app.js"`)
 
 	resp, body = b.post("/projects", url.Values{"name": {"Mina Norte"}, "description": {"Camiones"}}, nil)
 	if resp.StatusCode != http.StatusSeeOther {
@@ -1166,6 +1169,29 @@ func TestWebUserAdministration(t *testing.T) {
 	}
 	if _, ok, _ := e.svc.Authenticate(e.ctx, "ana", "nueva-contraseña-larga"); !ok {
 		t.Fatal("la contraseña nueva debería valer")
+	}
+}
+
+func TestWebStorageIsAdminOnly(t *testing.T) {
+	t.Parallel()
+
+	e := newEnv(t)
+	e.newAsset(e.newProject().ID, "a.blend")
+
+	plain := e.newBrowser()
+	plain.login("juan")
+	resp, body := plain.get("/admin/storage")
+	wantPage(t, resp, body, http.StatusForbidden, "Sin permiso")
+	if strings.Contains(body, `href="/admin/storage"`) {
+		t.Fatal("un modelador no debe ver el enlace a Espacio")
+	}
+
+	admin := e.newBrowser()
+	admin.login("jefa")
+	resp, body = admin.get("/admin/storage")
+	wantPage(t, resp, body, http.StatusOK, "Guardado en disco", "Mina Norte", "16,0 KB", "purge --keep-last", "gc --apply")
+	if strings.Contains(body, "No disponible") {
+		t.Fatal("en Unix debe mostrar el espacio libre")
 	}
 }
 

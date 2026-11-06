@@ -19,3 +19,6 @@
 /.claude/
 /skills-lock.json
 /.taste-skill/
+
+# Dependencias de la prueba de punta a punta
+/web/e2e/node_modules/

@@ -327,3 +327,18 @@ details.inline-form[open] { margin-bottom: var(--gap); }
   .stack-table .folder { padding: 8px 16px; }
   .delta-cell { min-width: 0; }
 }
+
+/* ---------- Mi carpeta (sincronización desde el navegador) ---------- */
+[hidden] { display: none !important; }
+.steps { display: grid; gap: 10px; margin: 0 0 16px; padding-left: 20px; }
+.check-list { display: grid; gap: 10px; }
+textarea.input { height: auto; padding: 8px 12px; resize: vertical; font: inherit; }
+td progress { display: block; width: 100%; max-width: 160px; height: 6px; margin-top: 4px; accent-color: var(--accent); }
+td .sub { display: block; color: var(--muted); font-size: var(--fs-small); }
+.sync-error { color: var(--negative); }
+.row-actions .btn { height: 30px; padding: 0 10px; }
+.row-actions .btn + .btn { margin-left: 6px; }
+.sync-log { display: grid; gap: 6px; padding: 0; list-style: none; max-height: 240px; overflow: auto; }
+dialog.panel { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--border); }
+dialog::backdrop { background: rgb(10 10 10 / 0.35); }
+.facts + .table-panel { margin-top: var(--gap); }

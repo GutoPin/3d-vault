@@ -21,7 +21,8 @@ El VPS ya existe y tiene espacio suficiente. Todo se guarda en el VPS.
 | Componente | Qué es | Dónde corre |
 |---|---|---|
 | `3dvault-server` | API + página web (historial, visor 3D, admin). Un solo binario Go. | VPS (Docker) |
-| `3dvault-sync` | Agente de sincronización con ícono en la bandeja y panel local. Un solo binario Go. | PC de cada modelador (Windows primero, macOS después) |
+| Mi carpeta (`/sync`) | Sincronización desde el navegador: la página trabaja con una carpeta local mediante la File System Access API. JavaScript sin dependencias, servido por `3dvault-server`. | Edge o Chrome en la PC de cada modelador |
+| `3dvault-cli` | Herramienta de comandos (`push`, `pull`, `lock`…) para pruebas y para el administrador. | Cualquier PC |
 | Caddy | Proxy inverso con HTTPS automático. | VPS (Docker) |
 
 ## 3. Principios
@@ -132,7 +133,13 @@ GET  /api/versions/{id}/download          → archivo completo reconstruido en s
 3dvault-server restore --from /ruta                                 # restaura y regenera server_epoch
 ```
 
-## 8. Agente de sincronización (`3dvault-sync`)
+## 8. Sincronización (página Mi carpeta)
+
+> **Cambio de plan (2026-11-06).** El agente `.exe` con ícono en la bandeja se reemplaza por la página **Mi carpeta** de la web. Un `.exe` sin firmar lo bloquean SmartScreen, Smart App Control o Defender, y firmarlo cuesta dinero y días de validación. El navegador (Edge viene con Windows) puede leer y escribir una carpeta elegida por el usuario. El protocolo, los trozos y las reglas de esta sección no cambian; lo que no aplica en el navegador se indica abajo. El código del agente Go queda en `internal/agent`, en pausa. Detalle en `docs/DECISIONES.md`.
+>
+> **No aplica en el navegador:** ícono de bandeja e inicio con Windows (la sincronización automática funciona con la pestaña abierta), atributo de solo lectura, `fsnotify` (se revisa al volver a la pestaña y cada minuto), API local en 127.0.0.1 y caché de trozos (se reutilizan los de la versión local). El estado va en IndexedDB y la carpeta elegida se recuerda, con un permiso que el navegador vuelve a pedir.
+
+### Diseño original del agente (referencia)
 
 **Stack:** Go, `fyne.io/systray` (ícono en bandeja), `github.com/fsnotify/fsnotify`, `modernc.org/sqlite` para el estado local, panel local servido en `http://127.0.0.1:<puerto>` (html/template + HTMX) que se abre desde el ícono. Compilar para `windows/amd64` primero; `darwin/arm64` después, en un Mac, porque `systray` requiere cgo en macOS.
 
@@ -219,23 +226,23 @@ Auth y tokens, proyectos, almacenamiento por trozos, manifiestos, versiones, blo
 - Backup restaurado en un entorno limpio y validado con `check`.
 - Coste de verificación medido con un archivo de 20 GB en el VPS. Si es excesivo, se verifica en segundo plano y la versión no se publica hasta terminar.
 
-### Fase 2 — Agente de sincronización (Windows)
-Asistente inicial, sincronización selectiva, bajada automática por trozos, solo lectura, bloquear/subir/liberar desde el panel, nuevos sin subir, conflictos, ignorados, ícono de bandeja, inicio con Windows, instalador simple (`.exe` firmado opcional, o zip).
+### Fase 2 — Sincronización desde el navegador
+Página Mi carpeta: elegir carpeta, sincronización selectiva por proyecto, bajada automática por trozos (SSE con la pestaña abierta, y revisión cada minuto), bloquear/subir/liberar, nuevos sin subir, conflictos, ignorados, una sola pestaña sincronizando. Sin instalador.
 
 **Aceptación:**
 - PC A sube v2; PC B la tiene en su carpeta en menos de 1 minuto sin hacer nada.
-- PC B no puede subir un archivo bloqueado por A y el archivo está en solo lectura en B.
+- PC B no puede subir un archivo bloqueado por A.
 - Provocar un conflicto deja la copia `*.conflicto-*` y la versión del servidor, sin pérdida.
-- Pausar y reanudar la sincronización funciona; reiniciar la PC conserva el estado.
+- Pausar y reanudar la sincronización funciona; cerrar y reabrir el navegador conserva el estado.
 - Editar un archivo con el agente apagado y recibir una versión nueva al encenderlo no pierde nada.
 - Renombrar un archivo en el Explorador no bifurca su historial.
 - Antes de pasar al equipo: guías escritas y backups automáticos fuera del VPS.
 
 ### Fase 3 — Vistas previas y mantenimiento
-Visor 3D, miniaturas `.blend`, `purge`, `gc`, `check`, uso de disco por proyecto, versión del agente para macOS.
+Visor 3D, miniaturas `.blend`, `purge`, `gc`, `check`, uso de disco por proyecto. macOS queda cubierto por Chrome.
 
 ### Fase 4 — Opcional
-Primero, el complemento de Blender (panel: estado, bloquear, subir con comentario, liberar; aviso al guardar si hay una versión más nueva) que habla con la API local del agente. Menú contextual en el Explorador de Windows. Superposición de íconos de estado.
+Primero, el complemento de Blender (panel: estado, bloquear, subir con comentario, liberar; aviso al guardar si hay una versión más nueva). Sin agente local, hablaría con el servidor directamente. Menú contextual en el Explorador de Windows. Superposición de íconos de estado.
 
 ## 13. Fuera de alcance (por ahora)
 

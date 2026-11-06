@@ -298,3 +298,28 @@ func TestConcurrentChunkers(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// hashData genera datos que JavaScript reproduce sin generador propio: la
+// concatenación de SHA-256(i) con i en little endian de 32 bits.
+func hashData(size int) []byte {
+	data := make([]byte, 0, size+sha256.Size)
+	var n [4]byte
+	for i := uint32(0); len(data) < size; i++ {
+		binary.LittleEndian.PutUint32(n[:], i)
+		sum := sha256.Sum256(n[:])
+		data = append(data, sum[:]...)
+	}
+	return data[:size]
+}
+
+// TestGoldenCutsWeb fija los cortes de web/server/static/sync/core.js. Tiene la
+// misma huella en web/sync_test.mjs: si una cambia, la web y el servidor dejan
+// de deduplicar entre sí.
+func TestGoldenCutsWeb(t *testing.T) {
+	t.Parallel()
+
+	const wantPrint = "914a77e6310914426999f20244aa1536d24dcba473db4056e9be2b321b537ff9"
+	if got := fingerprint(readAll(t, bytes.NewReader(hashData(40<<20)))); got != wantPrint {
+		t.Fatalf("huella %s", got)
+	}
+}

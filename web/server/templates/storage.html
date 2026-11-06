@@ -1,0 +1,65 @@
+{{define "content"}}
+{{$u := .Data}}
+<div class="title-row">
+  <div>
+    <h1>Espacio</h1>
+    <p class="sub">Lo que ocupan los proyectos en el disco del servidor.</p>
+  </div>
+</div>
+
+<section class="facts" aria-label="Uso del disco">
+  <div class="fact"><div class="label">Guardado en disco</div><div class="value lead">{{formatBytes $u.StoredBytes}}</div></div>
+  <div class="fact"><div class="label">Libre en el disco</div><div class="value">{{if $u.FreeKnown}}{{formatBytes $u.FreeBytes}}{{else}}No disponible{{end}}</div></div>
+  <div class="fact"><div class="label">Archivos</div><div class="value">{{$u.Assets}}</div></div>
+  <div class="fact"><div class="label">Versiones</div><div class="value">{{$u.Versions}}</div><div class="note">Incluye archivos borrados sin purgar</div></div>
+</section>
+
+<div class="panel table-panel">
+  {{if $u.Projects}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Proyecto</th><th class="n">Archivos</th><th class="n">Versiones</th><th class="n">Tamaño actual</th><th class="n">En disco</th></tr></thead>
+      <tbody>
+      {{range $u.Projects}}
+        <tr>
+          <td><a class="name" href="/projects/{{.ID}}">{{.Name}}</a></td>
+          <td class="n" data-label="Archivos:">{{.Assets}}</td>
+          <td class="n" data-label="Versiones:">{{.Versions}}</td>
+          <td class="n" data-label="Tamaño actual:">{{formatBytes .CurrentBytes}}</td>
+          <td class="n" data-label="En disco:">{{formatBytes .StoredBytes}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">Todavía no hay proyectos.</p>
+  {{end}}
+</div>
+
+<section class="settings-row">
+  <div>
+    <h2>Cómo leer la tabla</h2>
+  </div>
+  <div>
+    <p><b>Tamaño actual</b> suma la última versión de cada archivo, sin comprimir. <b>En disco</b> es lo que ocupan, comprimidos, los trozos de todas las versiones del proyecto, contando cada trozo una vez.</p>
+    <p>Un trozo que comparten varios proyectos cuenta en cada uno, así que la columna puede sumar más que el total guardado en disco.</p>
+  </div>
+</section>
+
+<section class="settings-row">
+  <div>
+    <h2>Liberar espacio</h2>
+    <p>Se hace en el VPS, con el servidor detenido. Haz antes una copia de seguridad.</p>
+  </div>
+  <div>
+    <p>Sin <code>--apply</code>, cada comando solo muestra lo que haría. <code>purge</code> conserva siempre la versión actual de cada archivo, las 10 últimas y las de los últimos 180 días, y quita del todo los archivos borrados hace más de 180 días. <code>gc</code> borra después los trozos que ya no usa ninguna versión.</p>
+    <div class="table-wrap"><pre><code>cd ~/3d-vault/deploy
+sudo docker compose stop server
+sudo docker compose run --rm server purge --keep-last 10 --older-than 180d
+sudo docker compose run --rm server purge --keep-last 10 --older-than 180d --apply
+sudo docker compose run --rm server gc --apply
+sudo docker compose up -d server</code></pre></div>
+  </div>
+</section>
+{{end}}

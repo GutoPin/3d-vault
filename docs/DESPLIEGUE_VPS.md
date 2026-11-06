@@ -92,14 +92,13 @@ La contraseña debe tener al menos 10 caracteres. Luego entra a `https://TU_DOMI
 
 ## 8. Prueba antes de invitar a nadie
 
-Comprueba desde tu laptop que el servidor recibe archivos, y luego verifica en el VPS:
+Desde tu laptop, en Edge o Chrome:
 
-```sh
-cd ~/dev/3d-vault
-GOMAXPROCS=2 nice -n 19 go build -p 1 -o bin/ ./cmd/3dvault-sync
-./bin/3dvault-sync login --server https://TU_DOMINIO --user TU_USUARIO
-./bin/3dvault-sync push --project "NOMBRE" --path pruebas/ESCENA5.blend --comment "Prueba inicial" ~/Descargas/ESCENA5.blend
-```
+1. Entra a `https://TU_DOMINIO/sync` (**Mi carpeta**) y elige una carpeta de prueba.
+2. Marca el proyecto, copia un `.blend` dentro de su carpeta, pulsa **Sincronizar ahora** y luego **Agregar…**.
+3. En otra ventana de incógnito, entra con otra cuenta, abre Mi carpeta con otra carpeta y comprueba que el archivo baja solo.
+
+Luego verifica los datos en el VPS:
 
 ```sh
 cd ~/3d-vault/deploy
@@ -130,35 +129,21 @@ rsync -a --rsync-path="sudo rsync" USUARIO@IP_DEL_VPS:/srv/3d-vault-backup/ ~/co
 
 Por un canal privado:
 
-1. El enlace: `https://TU_DOMINIO`
+1. El enlace: `https://TU_DOMINIO/sync`
 2. Su usuario y su contraseña
-3. El archivo `bin/3dvault-sync.exe` de tu laptop, ya compilado
-4. Estos comandos, para PowerShell:
+3. La guía `docs/GUIA_USUARIO.md`
 
-```powershell
-# Solo la primera vez
-.\3dvault-sync.exe login --server https://TU_DOMINIO --user SU_USUARIO
-
-# Para trabajar en un archivo, en este orden
-.\3dvault-sync.exe lock --project "NOMBRE" --path modelos/camion.blend
-.\3dvault-sync.exe pull --project "NOMBRE" --path modelos/camion.blend camion.blend
-# ...editar en Blender...
-.\3dvault-sync.exe push --project "NOMBRE" --path modelos/camion.blend --comment "Qué cambió" --release camion.blend
-```
-
-Si `pull` dice que ya existe un archivo distinto, hay que guardar esa copia aparte antes de usar `--overwrite`, porque esa opción la reemplaza.
+No hay nada que instalar: todo se hace en Edge o Chrome, así que Windows no tiene ningún programa que bloquear.
 
 **Nunca compartas:** el archivo `.env`, el acceso SSH ni tu cuenta de administrador.
 
 ## Avísales de esto antes de empezar
 
-Esto es la Fase 1, así que úsenlo como **piloto**, sin que sea la única copia de su trabajo:
+Úsenlo como **piloto** las primeras semanas, sin que sea la única copia de su trabajo:
 
-- **No hay sincronización automática:** eso llega con el agente de la Fase 2. Por ahora se sube y se baja a mano.
-- **Siempre hay que bloquear antes de editar:** `push` parte de la última versión del servidor, así que sin bloqueo alguien podría reemplazar el trabajo de otro. Queda en el historial, pero el cambio del otro deja de ser la versión actual.
-- **Hay que bloquear desde la herramienta, no desde la web:** un bloqueo hecho en la web impide subir desde el `.exe`. Se resuelve añadiendo `--takeover` al comando `lock`.
-- **Nadie puede cambiar su propia contraseña:** lo haces tú en **Usuarios**, y eso desconecta a esa persona, que tendrá que volver a hacer `login`.
-- **El `.exe` nunca se ha ejecutado en Windows:** solo está compilado, y como no está firmado, SmartScreen puede advertir al abrirlo. Pruébalo en una PC antes de repartirlo.
+- **Siempre hay que bloquear antes de editar.** Si dos editan a la vez sin bloquear, no se pierde nada (queda una copia `*.conflicto-*`), pero hay que unir los cambios a mano.
+- **La actualización automática funciona con la pestaña de Mi carpeta abierta.** Con la pestaña cerrada, los archivos siguen ahí y se ponen al día al volver a abrirla.
+- **Nadie puede cambiar su propia contraseña:** lo haces tú en **Usuarios**, y eso cierra su sesión.
 
 ## Para actualizar más adelante
 

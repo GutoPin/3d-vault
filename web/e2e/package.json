@@ -1,0 +1,7 @@
+{
+  "name": "3dvault-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node sync.e2e.mjs" },
+  "devDependencies": { "playwright-core": "1.56.1" }
+}

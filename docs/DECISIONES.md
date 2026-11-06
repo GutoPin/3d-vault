@@ -65,6 +65,43 @@ v2 no es un guardado real de v1: son dos escenas distintas, así que esto valida
 - Coste de verificación de un archivo de 20 GB en el VPS.
 - Guardados consecutivos reales (Fase 0).
 
+## Cambio de plan: sincronización desde el navegador (2026-11-06)
+
+**Problema.** El responsable del proyecto advirtió que un `.exe` repartido a los modeladores deja de abrirse a los pocos días. Un binario sin firmar choca con SmartScreen, con Smart App Control en Windows 11 (bloquea sin opción de saltarlo) y con falsos positivos de Defender, frecuentes en binarios Go. Firmarlo exige un certificado de pago y una validación de identidad de varios días, y los usuarios no saben usar la terminal.
+
+**Decisión.** La sincronización pasa a la web: la página **Mi carpeta** (`/sync`) usa la File System Access API de Edge y Chrome para leer y escribir una carpeta que el usuario elige una vez. No hay nada que instalar ni que Windows pueda bloquear. Se eligió entre tres opciones: carpeta conectada en la web (elegida), solo subir y bajar archivos sueltos desde la web, o seguir con el `.exe` firmado.
+
+**Qué se conserva.** El protocolo, el corte en trozos y las reglas del servidor no cambian. El JavaScript corta con el mismo FastCDC: solo usa los 32 bits bajos de la tabla, porque las máscaras miran los 22 bits bajos y en `(fp<<1)+g` los acarreos solo suben, así que los cortes son idénticos a los de Go. `TestGoldenCutsWeb` en Go y `web/sync_test.mjs` fijan la misma huella sobre los mismos datos.
+
+**Qué se pierde:**
+
+- La actualización automática solo ocurre con la pestaña abierta. Con ella cerrada, al reabrir se pone al día.
+- Sin atributo de solo lectura. Lo compensan el bloqueo, que el servidor exige, y la copia `*.conflicto-*`.
+- Solo Edge y Chrome (también en macOS). Firefox y Safari no tienen la API.
+- El navegador vuelve a pedir permiso para la carpeta en cada sesión, salvo que el usuario elija "Permitir siempre".
+
+El agente Go (`internal/agent`, sin tests ni interfaz) queda en pausa, no se borra: sirve si algún día se firma un `.exe`.
+
+## Prueba de punta a punta de la Fase 2 (2026-11-06)
+
+`make e2e`: dos Chromium sin pantalla, con usuarios distintos y cada uno con su carpeta (OPFS, la misma API que una carpeta local), contra el servidor real.
+
+| Prueba | Resultado |
+|---|---|
+| A agrega un archivo de 12 MiB | v1 creada |
+| B marca el proyecto | Lo recibe con el mismo SHA-256 |
+| A bloquea | B ve el bloqueo sin hacer nada |
+| A cambia 64 KiB en medio y sube | v2, 90 % reutilizado |
+| B recibe v2 sin hacer nada | En 0,4 s, bajando 1 trozo |
+| B edita sin bloqueo e intenta subir | "Bloqueado por Guto desde…" |
+| A sube v3 mientras B tiene cambios locales | B conserva `camion.conflicto-ana-<fecha>.blend` y recibe v3 |
+| B borra el archivo localmente | No se propaga. Queda "No está en tu carpeta" y se recupera con Descargar |
+| B recarga la página | Estado conservado, 0 trozos descargados |
+
+Velocidad del análisis en JavaScript (Node, esta laptop): corte 321 MiB/s, SHA-256 244 MiB/s, análisis completo 143 MiB/s, unos 15 s para un `.blend` de 2 GB.
+
+**Sin probar:** Edge en Windows con una carpeta real (el selector no se puede automatizar), archivos de varios GB en el navegador y la pantalla en un teléfono, que no tiene la API.
+
 ## Web
 
 Estilo `achromatic-ledger` de la skill `design-taste-frontend` (semilla 1914576395), sin rediseños. Rasgo propio: fondo gris azulado de libro de registro y, en cada versión, cuánto cambió respecto a la anterior, único dato con color.
@@ -86,7 +123,7 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | Los trozos llevan un byte de formato | El contenido de un `.blend` comprimido también empieza por la firma de zstd |
 | `POST /api/login` con `token_name` devuelve un token | El agente no guarda contraseña. Es una ampliación de la API de `PLAN.md` |
 | `POST /api/projects`, `GET /api/me` y `POST /api/logout` añadidos | Hacen falta y `PLAN.md` no los listaba |
-| "Mi cuenta", actividad, `purge` y `gc` no están en la Fase 1 | No forman parte de su alcance. El admin cambia contraseñas desde Usuarios |
+| "Mi cuenta" y actividad no están en la Fase 1; `purge` y `gc` llegaron en la Fase 3 | No forman parte de su alcance. El admin cambia contraseñas desde Usuarios |
 | HTMX y Geist incluidos en el binario, sin CDN | Sistema interno. HTMX 2.0.4 y Geist con licencia OFL |
 | El producto se llama 3D-Vault | Petición del usuario. Binarios `3dvault-server` y `3dvault-sync` |
 | Módulo Go `3d-vault` | Aún no hay repositorio remoto; cambiará cuando exista |
@@ -95,6 +132,23 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | FastCDC adaptado en `internal/chunker`, sin depender de `jotfs/fastcdc-go` | Licencia Apache 2.0. Última versión de 2020 y un error de concurrencia abierto: modifica una tabla global al crear cada instancia |
 | Parámetros fijos y sin semilla en FastCDC | La semilla protege frente a ataques de huella por tamaño de trozo, algo que no aplica a un sistema interno. Los cortes quedan fijados por `TestGoldenCuts` |
 | El aviso de *Compress* en el agente queda en suspenso | Las primeras mediciones no justifican avisar. Se decide con los guardados consecutivos |
+| Sincronización en el navegador con File System Access API, en lugar del agente `.exe` | Ver "Cambio de plan". Sin instalar nada, sin firma |
+| JavaScript propio sin dependencias ni compilación: `core.js` (corte y SHA-256), `engine.js` (sincronización, sin DOM) y `app.js` (interfaz) | Pocas líneas. `engine.js` funciona con cualquier carpeta del navegador, lo que permite probarlo con OPFS |
+| SHA-256 incremental en JavaScript para el archivo completo y nativo (`crypto.subtle`) para cada trozo | `crypto.subtle` no es incremental y un `.blend` no cabe en memoria |
+| Estado local en IndexedDB: versión, hash, tamaño y fecha de cada archivo. Un archivo con el mismo tamaño y fecha se da por igual | Igual que el agente. Si cambia, se recalcula el hash antes de decidir |
+| Al bajar una versión se copian de la copia local los trozos de la versión anterior, según el manifiesto del servidor | No hace falta releer la copia local para saber qué tiene. Si el resultado no coincide, se baja completo. Si `purge` borró esa versión, también |
+| Una sola pestaña sincroniza, con Web Locks | Dos pestañas bajarían el mismo archivo a la vez |
+| El bloqueo pertenece a esta pestaña del navegador: un id aleatorio en `localStorage` hace de PC | La regla de bloqueo por PC sigue valiendo. El nombre de la PC se puede cambiar en Ajustes |
+| Un archivo que desaparece del servidor se borra de la carpeta solo si no cambió localmente; si cambió, queda como "Nuevo, sin subir" | Nunca se pierde trabajo local |
+| Un movimiento en el servidor se ve como borrado más archivo nuevo, y se baja completo | Es raro y no pierde nada. Optimizarlo puede esperar |
+| `.3dvaultignore` no se implementa en el navegador | Los patrones fijos cubren los casos conocidos. Se añade si hace falta |
+| `[hidden]` con `display: none !important` en `app.css` | Las clases de la web fijan `display` y anulaban el atributo |
+| Simulación de `purge` y `gc`: la misma transacción, deshecha al final | La simulación coincide siempre con lo real |
+| `purge` conserva la versión actual, las N más nuevas y las posteriores al corte. A un archivo borrado antes del corte le quita todas | Reglas de `PLAN.md`. La lista se fija en una tabla temporal antes de borrar |
+| La fila de un archivo purgado se conserva, sin versiones | Los eventos y la actividad apuntan a ella |
+| Un manifiesto solo se borra si ninguna versión lo usa | Protege a las versiones restauradas, que comparten el de su origen |
+| `gc` borra primero las filas y después los archivos | Si se corta, quedan archivos sin fila, inofensivos, que recoge el siguiente `gc` |
+| `purge` y `gc` solo con el servidor detenido | Una subida en curso tiene trozos que aún no referencia ningún manifiesto |
 
 ## Cambios a la especificación
 
@@ -115,4 +169,6 @@ Ya incorporados en `PLAN.md`.
 
 ## Riesgos abiertos
 
-- **Versión vieja en la memoria de Blender:** B tiene v7 abierta, el agente instala v8, B bloquea y guarda. Se sube una v9 sin los cambios de v8. El agente avisa al bloquear, pero solo el complemento de Blender puede cerrarlo del todo. Por eso es lo primero de la Fase 4.
+- **Versión vieja en la memoria de Blender:** B tiene v7 abierta, Mi carpeta instala v8, B bloquea y guarda. Se sube una v9 sin los cambios de v8. La página avisa al bloquear, pero solo el complemento de Blender puede cerrarlo del todo. Por eso es lo primero de la Fase 4.
+- **Pestaña cerrada:** quien cierre Mi carpeta trabaja con archivos que pueden quedar atrasados. El bloqueo lo protege: al bloquear, la página baja la última versión antes de que edite.
+- **Agentes muy atrasados y `purge`:** una versión purgada ya no tiene manifiesto. Mi carpeta lo tolera bajando el archivo completo.

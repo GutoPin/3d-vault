@@ -1,0 +1,97 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <h1>Mi carpeta</h1>
+    <p class="sub" id="sync-summary">Tus proyectos en una carpeta de esta PC, siempre al día.</p>
+  </div>
+  <div class="actions" id="sync-actions" hidden>
+    <button class="btn" type="button" data-action="pause" id="pause-btn">Pausar</button>
+    <button class="btn primary" type="button" data-action="sync-now">Sincronizar ahora</button>
+  </div>
+</div>
+
+<p class="notice" id="sync-notice" role="status" hidden></p>
+
+<section class="panel" id="sync-unsupported" hidden>
+  <h2>Abre esta página en Microsoft Edge o Google Chrome</h2>
+  <p class="sub">Este navegador no permite trabajar con una carpeta de la PC. Edge viene instalado en Windows. Mientras tanto puedes descargar cada versión desde la ficha del archivo.</p>
+</section>
+
+<section class="panel" id="sync-other-tab" hidden>
+  <h2>Ya está abierta en otra pestaña</h2>
+  <p class="sub">Solo una pestaña sincroniza a la vez. Ciérrala o usa esa.</p>
+</section>
+
+<section class="settings-row" id="sync-setup" hidden>
+  <div>
+    <h2>Elige tu carpeta</h2>
+    <p>Se hace una sola vez. Dentro aparecerá una carpeta por cada proyecto que marques.</p>
+  </div>
+  <div class="panel">
+    <ol class="steps">
+      <li>Crea una carpeta para 3D-Vault, por ejemplo <b>D:\3D-Vault</b> o <b>Documentos\3D-Vault</b>. Windows no deja usar Documentos ni el Escritorio directamente: tiene que ser una carpeta dentro.</li>
+      <li>Pulsa el botón, elige esa carpeta y acepta <b>Ver archivos</b> y <b>Guardar cambios</b>.</li>
+      <li>Marca los proyectos que quieres tener en tu PC.</li>
+    </ol>
+    <div class="form-foot"><button class="btn primary" type="button" data-action="pick">Elegir carpeta</button></div>
+  </div>
+</section>
+
+<section class="settings-row" id="sync-resume" hidden>
+  <div>
+    <h2>Permite el acceso a tu carpeta</h2>
+    <p>El navegador vuelve a preguntar cada vez que abres la página. Si te ofrece <b>Permitir siempre</b>, elígelo.</p>
+  </div>
+  <div class="panel form-foot">
+    <button class="btn" type="button" data-action="pick">Elegir otra carpeta</button>
+    <button class="btn primary" type="button" data-action="resume">Permitir y sincronizar</button>
+  </div>
+</section>
+
+<div id="sync-main" hidden>
+  <section class="settings-row">
+    <div>
+      <h2>Proyectos en esta PC</h2>
+      <p>Carpeta: <b id="root-name"></b>. <button class="text-action" type="button" data-action="pick">Cambiar</button></p>
+    </div>
+    <div class="panel check-list" id="project-picks"></div>
+  </section>
+
+  <div id="project-tables"></div>
+
+  <div class="ledger-head">
+    <h2>Actividad de esta sesión</h2>
+    <p>Lo que bajó, subió o se resolvió desde que abriste la página.</p>
+  </div>
+  <div class="panel"><ol class="sync-log" id="sync-log"><li class="free">Nada todavía.</li></ol></div>
+
+  <details class="settings-row inline-form">
+    <summary class="text-action">Ajustes de esta PC</summary>
+    <form class="panel form-grid" id="client-form">
+      <div class="field">
+        <label for="client-name">Nombre de esta PC</label>
+        <input class="input" id="client-name" maxlength="60" required>
+        <span class="hint">Lo ven los demás cuando bloqueas un archivo.</span>
+      </div>
+      <div class="wide form-foot"><button class="btn" type="submit">Guardar</button></div>
+    </form>
+  </details>
+</div>
+
+<dialog id="upload-dialog" class="panel">
+  <form method="dialog" class="form-grid">
+    <h2 class="wide" id="upload-title">Subir versión</h2>
+    <div class="field wide">
+      <label for="upload-comment">¿Qué cambió?</label>
+      <textarea class="input" id="upload-comment" rows="3" minlength="3" maxlength="500" required></textarea>
+    </div>
+    <label class="check wide" id="upload-release-row"><input type="checkbox" id="upload-release" checked> Liberar el bloqueo al terminar</label>
+    <div class="wide form-foot">
+      <button class="btn ghost" type="button" data-action="cancel-upload">Cancelar</button>
+      <button class="btn primary" type="submit" value="ok">Subir</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="/static/sync/app.js"></script>
+{{end}}

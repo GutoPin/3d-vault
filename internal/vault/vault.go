@@ -688,3 +688,71 @@ func (s *Service) ProjectSummaries(ctx context.Context) ([]ProjectSummary, error
 	})
 	return summaries, err
 }
+
+// ProjectStorage es el uso de disco de un proyecto.
+type ProjectStorage struct {
+	ID   int64
+	Name string
+	// Assets cuenta los archivos actuales; Versions, todas las guardadas, también
+	// las de archivos borrados que aún no se han purgado.
+	Assets       int
+	Versions     int
+	CurrentBytes int64
+	// StoredBytes es lo que ocupan en disco los trozos distintos que usa. Un trozo
+	// compartido con otro proyecto cuenta en los dos.
+	StoredBytes int64
+}
+
+// StorageUsage es el uso de disco del almacén.
+type StorageUsage struct {
+	StoredBytes int64
+	FreeBytes   int64
+	FreeKnown   bool
+	Assets      int
+	Versions    int
+	Projects    []ProjectStorage
+}
+
+// StorageUsage calcula el uso de disco total y por proyecto.
+func (s *Service) StorageUsage(ctx context.Context) (StorageUsage, error) {
+	var usage StorageUsage
+	free, err := s.store.FreeBytes()
+	usage.FreeBytes, usage.FreeKnown = free, err == nil
+
+	err = s.db.ReadTx(ctx, func(tx *sql.Tx) error {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(stored_size), 0) FROM chunks`).Scan(&usage.StoredBytes); err != nil {
+			return fmt.Errorf("sumar trozos: %w", err)
+		}
+		// ponytail: recorre todos los manifiestos en cada visita. Es una página de
+		// administración; si se vuelve lenta, guardar los totales al subir.
+		rows, err := tx.QueryContext(ctx, `
+			SELECT p.id, p.name,
+				(SELECT COUNT(*) FROM assets a WHERE a.project_id = p.id AND a.deleted_at IS NULL),
+				(SELECT COUNT(*) FROM versions v JOIN assets a ON a.id = v.asset_id WHERE a.project_id = p.id),
+				(SELECT COALESCE(SUM(v.size_bytes), 0) FROM assets a
+					JOIN versions v ON v.asset_id = a.id AND v.number = a.head_version
+					WHERE a.project_id = p.id AND a.deleted_at IS NULL),
+				(SELECT COALESCE(SUM(c.stored_size), 0) FROM chunks c WHERE c.sha256 IN (
+					SELECT mc.chunk_sha256 FROM assets a
+					JOIN versions v ON v.asset_id = a.id
+					JOIN manifest_chunks mc ON mc.manifest_id = v.manifest_id
+					WHERE a.project_id = p.id))
+			FROM projects p
+			ORDER BY p.name_key`)
+		if err != nil {
+			return fmt.Errorf("calcular el uso por proyecto: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var p ProjectStorage
+			if err := rows.Scan(&p.ID, &p.Name, &p.Assets, &p.Versions, &p.CurrentBytes, &p.StoredBytes); err != nil {
+				return fmt.Errorf("leer el uso de un proyecto: %w", err)
+			}
+			usage.Assets += p.Assets
+			usage.Versions += p.Versions
+			usage.Projects = append(usage.Projects, p)
+		}
+		return rows.Err()
+	})
+	return usage, err
+}

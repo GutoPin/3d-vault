@@ -44,7 +44,7 @@ func loadPages() (*pageSet, error) {
 		"when":          func(t time.Time) string { return formatWhen(t, time.Now()) },
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "message"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -187,6 +187,7 @@ func (s *Server) webRoutes(r chi.Router) {
 
 		r.Post("/logout", s.webLogout)
 		r.Get("/", s.webProjects)
+		r.Get("/sync", s.webSync)
 		r.Post("/projects", s.webCreateProject)
 		r.Get("/projects/{id}", s.webProject)
 		r.Get("/assets/{id}", s.webAsset)
@@ -201,6 +202,7 @@ func (s *Server) webRoutes(r chi.Router) {
 			r.Post("/admin/users", s.webCreateUser)
 			r.Post("/admin/users/{id}/active", s.webSetActive)
 			r.Post("/admin/users/password", s.webSetPassword)
+			r.Get("/admin/storage", s.webStorage)
 		})
 	})
 }
@@ -236,6 +238,12 @@ func parseForm(w http.ResponseWriter, r *http.Request) error {
 func webActor(r *http.Request) rules.Actor {
 	user, _ := currentUser(r)
 	return rules.Actor{UserID: user.ID, IsAdmin: user.IsAdmin, ClientID: webClientID, ClientName: webClientName}
+}
+
+// webSync es la página "Mi carpeta": la sincronización la hace el navegador
+// con la API, así que la plantilla solo trae el esqueleto.
+func (s *Server) webSync(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, http.StatusOK, "sync", pageData{Title: "Mi carpeta", Active: "sync"})
 }
 
 type loginData struct {

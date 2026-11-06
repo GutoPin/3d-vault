@@ -21,12 +21,14 @@
   <nav class="sidebar" aria-label="Principal">
     <label class="btn ghost close-menu" for="menu">Cerrar</label>
     <a class="brand" href="/">{{template "brand"}}3D-Vault</a>
+    <a class="nav-item" href="/sync"{{if eq .Active "sync"}} aria-current="page"{{end}}>Mi carpeta</a>
     <div class="group-label">Proyectos</div>
     <a class="nav-item" href="/"{{if eq .Active "projects"}} aria-current="page"{{end}}>Todos los proyectos</a>
     {{range .Projects}}<a class="nav-item" href="/projects/{{.ID}}"{{if eq $.ActiveProject .ID}} aria-current="page"{{end}}><span class="nav-name">{{.Name}}</span></a>
     {{end}}
     {{if .User.IsAdmin}}<div class="group-label">Administración</div>
-    <a class="nav-item" href="/admin/users"{{if eq .Active "users"}} aria-current="page"{{end}}>Usuarios</a>{{end}}
+    <a class="nav-item" href="/admin/users"{{if eq .Active "users"}} aria-current="page"{{end}}>Usuarios</a>
+    <a class="nav-item" href="/admin/storage"{{if eq .Active "storage"}} aria-current="page"{{end}}>Espacio</a>{{end}}
     <div class="bottom user-row">
       <div class="who">{{.User.DisplayName}}<span>{{.User.Username}}</span></div>
       <form method="post" action="/logout"><button class="btn" type="submit">Salir</button></form>
