@@ -374,3 +374,30 @@ ol.steps-small { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; l
 .upload-foot { align-items: center; justify-content: space-between; gap: 12px; }
 .notice.warn { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
 .sync-filter { margin-top: 8px; }
+
+/* ---------- modo oscuro: sigue la preferencia del sistema ---------- */
+:root { color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0f1115;
+    --surface: #171a1f;
+    --raised: #20242b;
+    --active: #262b33;
+    --border: #2a2f37;
+    --rule: #22262d;
+    --control: #3a404a;
+    --text: #e8eaed;
+    --muted: #a0a6ad;
+    --faint: #959ba2;
+    --accent: #6ea8f7;
+    --primary: #e8eaed;
+    --primary-ink: #0f1115;
+    --positive: #6fd08c; --negative: #ff8a80; --warning: #f5c46a;
+    --pill-positive-bg: #12301c; --pill-positive-ink: #a6ebba;
+    --pill-negative-bg: #3a1618; --pill-negative-ink: #ffb4ab;
+    --pill-warning-bg: #33260b; --pill-warning-ink: #f5d08a;
+    --pill-neutral-bg: #262b33; --pill-neutral-ink: #d0d3d8;
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4.5 2.5 8 6l-3.5 3.5' fill='none' stroke='%23e8eaed' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  dialog::backdrop { background: rgb(0 0 0 / 0.6); }
+}

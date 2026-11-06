@@ -188,6 +188,7 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | La prueba del complemento ejecuta los `draw` del panel con una maqueta de layout que valida íconos y operadores | Sin interfaz, un nombre de ícono u operador equivocado solo fallaría en la Blender real |
 | "Arreglar texturas" en Blender: copia a `texturas/` del proyecto las imágenes de fuera, pone rutas relativas y sube las nuevas | Cada PC tiene la carpeta raíz en otro sitio: una ruta absoluta o una imagen en Descargas se ve rosa en las demás. Si ya existe una textura con ese nombre y otro contenido, se añade un sufijo |
 | El complemento revisa cada minuto el archivo abierto y avisa si otra persona subió una versión | Funciona sin Mi carpeta abierta. Reutiliza la revisión normal: unas pocas peticiones por minuto |
+| Modo oscuro que sigue la preferencia del sistema, redefiniendo los tokens de color | Toda la interfaz usa variables. Sin interruptor propio: el sistema ya lo tiene. Revisado con capturas de Mi carpeta y de la ficha con visor |
 | Buscador y "Solo lo que necesita algo de mí" en Mi carpeta, en el navegador | Filtra las filas que ya están en memoria |
 | Subir desde la ficha o el proyecto con `pushFile`, compartida con Mi carpeta | Sirve en cualquier navegador. Usa la identidad de Mi carpeta solo si el bloqueo es de ella; si no, la de la web, igual que los botones de esa página |
 
