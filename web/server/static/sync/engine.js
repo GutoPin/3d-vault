@@ -77,6 +77,46 @@ function conflictName(name, username, now = new Date()) {
 
 const sameFile = (rec, file) => rec && rec.size === file.size && rec.mtime === file.lastModified;
 
+// pushFile sube un archivo enviando solo los trozos que faltan y confirma la
+// versión (o crea el archivo si no hay assetId). La usan Mi carpeta y la subida
+// desde la ficha o el proyecto, en cualquier navegador.
+export async function pushFile(api, file, { scan: doScan, assetId, baseVersion, projectId, path, comment, releaseLock, progress = () => {} }) {
+  const { manifest, offsets } = doScan ? await doScan() : await scan(file, (n) => progress('Analizando', n, file.size));
+  const sizes = new Map(manifest.chunks.map((c) => [c.sha256, c.size]));
+  const unique = [...offsets.keys()];
+  const missing = [];
+  for (let i = 0; i < unique.length; i += MISSING_BATCH) {
+    const res = await api.json('POST', '/api/chunks/missing', { hashes: unique.slice(i, i + MISSING_BATCH) });
+    missing.push(...res.missing);
+  }
+
+  const total = missing.reduce((s, h) => s + sizes.get(h), 0);
+  let sent = 0;
+  let next = 0;
+  const worker = async () => {
+    while (next < missing.length) {
+      const h = missing[next++];
+      const off = offsets.get(h);
+      const data = new Uint8Array(await file.slice(off, off + sizes.get(h)).arrayBuffer());
+      await api.raw('PUT', `/api/chunks/${h}`, data);
+      sent += data.length;
+      progress('Subiendo', sent, total);
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: PARALLEL }, worker));
+  } finally {
+    progress('Subiendo', total, total);
+  }
+
+  const result = assetId
+    ? await api.json('POST', `/api/assets/${assetId}/versions`, {
+        base_version: baseVersion, manifest, size_bytes: file.size, comment, release_lock: Boolean(releaseLock),
+      })
+    : await api.json('POST', '/api/assets', { project_id: projectId, path, manifest, comment });
+  return { result, sha: manifest.file_sha256, reused: 100 * (1 - total / (file.size || 1)) };
+}
+
 // Project sincroniza un proyecto con su carpeta. state guarda, por archivo, la
 // versión que hay en disco: {get, put, delete, all} sobre IndexedDB.
 export class Project {
@@ -148,9 +188,28 @@ export class Project {
     }
 
     for (const [key, l] of local) rows.push({ key, local: l, status: 'new' });
+    await this.findMoves(rows);
     rows.sort((a, b) => (a.asset?.path ?? a.local.path).localeCompare(b.asset?.path ?? b.local.path));
-    this.rows = rows;
-    return rows;
+    this.rows = rows.filter((r) => !r.movedTo);
+    return this.rows;
+  }
+
+  // findMoves empareja un archivo nuevo con uno que falta y tiene el mismo
+  // contenido: es un renombrado o un movimiento hecho en el Explorador.
+  async findMoves(rows) {
+    const missing = rows.filter((r) => r.status === 'missing');
+    if (!missing.length) return;
+    for (const row of rows.filter((r) => r.status === 'new')) {
+      const file = await row.local.handle.getFile();
+      if (!missing.some((m) => !m.movedTo && m.asset.size_bytes === file.size)) continue;
+      const { manifest } = await this.scanCached(row.key, file);
+      const from = missing.find((m) => !m.movedTo && m.asset.file_sha256 === manifest.file_sha256);
+      if (from) {
+        row.status = 'moved';
+        row.from = from;
+        from.movedTo = row;
+      }
+    }
   }
 
   async reconcile(row) {
@@ -298,44 +357,23 @@ export class Project {
   // upload sube un archivo con comentario. Si es nuevo, lo crea en el servidor.
   async upload(row, comment, releaseLock) {
     const file = await row.local.handle.getFile();
-    const { manifest, offsets } = await this.scanCached(row.key, file);
-    const sizes = new Map(manifest.chunks.map((c) => [c.sha256, c.size]));
+    const r = await pushFile(this.api, file, {
+      scan: () => this.scanCached(row.key, file),
+      assetId: row.asset?.id, baseVersion: row.rec?.version, projectId: this.project.id, path: row.local.path, comment, releaseLock,
+      progress: (action, done, total) => this.progress({ key: row.key, action, done, total }),
+    });
+    await this.record(row.key, r.result.asset, file, r.sha);
+    return { noChanges: r.result.no_changes, version: r.result.version.number, reused: r.reused };
+  }
 
-    const unique = [...offsets.keys()];
-    const missing = [];
-    for (let i = 0; i < unique.length; i += MISSING_BATCH) {
-      const res = await this.api.json('POST', '/api/chunks/missing', { hashes: unique.slice(i, i + MISSING_BATCH) });
-      missing.push(...res.missing);
-    }
-
-    const total = missing.reduce((s, h) => s + sizes.get(h), 0);
-    let sent = 0;
-    let next = 0;
-    const worker = async () => {
-      while (next < missing.length) {
-        const h = missing[next++];
-        const off = offsets.get(h);
-        const data = new Uint8Array(await file.slice(off, off + sizes.get(h)).arrayBuffer());
-        await this.api.raw('PUT', `/api/chunks/${h}`, data);
-        sent += data.length;
-        this.progress({ key: row.key, action: 'Subiendo', done: sent, total });
-      }
-    };
-    try {
-      await Promise.all(Array.from({ length: PARALLEL }, worker));
-    } finally {
-      this.progress({ key: row.key, done: total, total });
-    }
-
-    const result = row.asset
-      ? await this.api.json('POST', `/api/assets/${row.asset.id}/versions`, {
-          base_version: row.rec.version, manifest, size_bytes: file.size, comment, release_lock: releaseLock,
-        })
-      : await this.api.json('POST', '/api/assets', { project_id: this.project.id, path: row.local.path, manifest, comment });
-
-    await this.record(row.key, result.asset, file, manifest.file_sha256);
-    const size = file.size || 1;
-    return { noChanges: result.no_changes, version: result.version.number, reused: 100 * (1 - total / size) };
+  // move cambia la ruta en el servidor de un archivo que se renombró o movió en
+  // la carpeta, para que conserve su historial.
+  async move(row) {
+    const { from } = row;
+    await this.api.json('POST', `/api/assets/${from.asset.id}/move`, { base_version: from.asset.head_version, path: row.local.path });
+    await this.state.delete(from.key);
+    const file = await row.local.handle.getFile();
+    await this.record(row.key, { ...from.asset, path: row.local.path }, file, from.asset.file_sha256);
   }
 
   lock(row, takeover = false) {

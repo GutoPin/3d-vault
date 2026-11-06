@@ -38,6 +38,15 @@ Por un canal privado:
 2. Su usuario y su contraseña.
 3. La guía [`GUIA_USUARIO.md`](GUIA_USUARIO.md). Que sigan el apartado para instalarla como aplicación y abrirla al iniciar sesión: es lo que hace que la sincronización sea automática.
 
+## Complemento de Blender
+
+El servidor lo entrega en `/blender/3dvault.zip`, siempre en la versión que corresponde al servidor. Tras actualizar el servidor, que cada uno lo vuelva a instalar desde Mi carpeta si cambió.
+
+- Se conecta con un **código** que genera Mi carpeta: lleva la dirección del servidor, un token de API y la identidad de esa PC. Por eso un bloqueo hecho en Blender vale también en Mi carpeta. Blender no guarda contraseñas.
+- Cada código es un token. Para cortar el acceso de una PC, cambia la contraseña de esa persona: revoca sus tokens.
+- Necesita *Permitir acceso en línea* (Preferencias → Sistema → Red) y Blender 4.2 o posterior.
+- Para subir, exige tener el bloqueo: así nunca reemplaza una versión de otro.
+
 ## Vistas previas
 
 - **Miniaturas de `.blend`:** salen del propio archivo, si se guardó con *Save Preview Images*. Se generan al subir y se guardan en `DATA_DIR/thumbs`, que no entra en el backup porque se regenera sola.

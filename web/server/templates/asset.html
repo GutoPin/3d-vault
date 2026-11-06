@@ -86,4 +86,18 @@
     </table>
   </div>
 </div>
+{{if or (not $asset.Lock) (eq $asset.Lock.UserID $.User.ID)}}
+<section class="settings-row">
+  <div>
+    <h2>Subir nueva versión</h2>
+    <p>Desde cualquier navegador, sin carpeta conectada. Solo viaja lo que cambió. Si lo editas a diario, mejor usa Mi carpeta.</p>
+  </div>
+  <form class="panel form-grid" id="web-upload" data-asset="{{$asset.ID}}" data-base="{{$asset.HeadVersion}}" data-project="{{.Data.Project.ID}}" data-lock-client="{{with $asset.Lock}}{{.ClientID}}{{end}}">
+    <div class="field wide"><label for="file">Archivo {{$asset.Ext}}</label><input class="input file-input" id="file" name="file" type="file" accept="{{$asset.Ext}}" required></div>
+    <div class="field wide"><label for="comment">¿Qué cambió?</label><input class="input" id="comment" name="comment" minlength="3" maxlength="500" required></div>
+    <div class="wide form-foot upload-foot"><span class="sub" data-status role="status"></span><button class="btn primary" type="submit">Subir</button></div>
+  </form>
+</section>
+<script type="module" src="/static/upload.js"></script>
+{{end}}
 {{end}}

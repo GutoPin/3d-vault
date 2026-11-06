@@ -213,6 +213,33 @@ try {
   assert.deepEqual(copied, ['fuera/nota.txt', 'fuera/ruedas/rueda.blend']);
   step(`Soltar una carpeta copia su estructura sin respaldos: ${copied.join(', ')}`);
 
+  // Renombrar en el Explorador de B: se detecta y se mueve en el servidor sin perder historial.
+  await b.evaluate(async () => {
+    const { d } = await dir('modelos/camion.blend');
+    const f = await (await d.getFileHandle('camion.blend')).getFile();
+    const w = await (await d.getFileHandle('camion_797F.blend', { create: true })).createWritable();
+    await f.stream().pipeTo(w);
+    await d.removeEntry('camion.blend');
+  });
+  await b.click('[data-action=sync-now]');
+  await waitRow(b, 'modelos/camion_797F.blend', 'moved');
+  assert.equal(await b.evaluate(() => window.row('modelos/camion.blend')), undefined);
+  await b.click('button[data-action=move][data-key="modelos/camion_797f.blend"]');
+  await waitRow(b, 'modelos/camion_797F.blend', 'ok');
+  const moved = await a.evaluate(() => fetch('/api/projects/1/snapshot').then((r) => r.json()).then((s) => s.assets.find((x) => x.path === 'modelos/camion_797F.blend')));
+  assert.equal(moved?.head_version, 3);
+  await a.waitForFunction(async () => (await list()).includes('modelos/camion_797F.blend') && !(await list()).includes('modelos/camion.blend'), null, { timeout: 60000, polling: 500 });
+  step('Renombrar en el Explorador se mueve en el servidor con su historial (v3) y llega a A');
+
+  // Subir desde la ficha del archivo, sin carpeta conectada.
+  await a.goto(`${BASE}/assets/${moved.id}`);
+  await a.setInputFiles('#file', { name: 'camion_797F.blend', mimeType: 'application/octet-stream', buffer: Buffer.from('versión subida desde la ficha'.repeat(1000)) });
+  await a.fill('#comment', 'Desde la ficha');
+  await a.click('#web-upload button[type=submit]');
+  await a.waitForSelector('text=Desde la ficha', { timeout: 30000 });
+  await b.waitForFunction(() => window.row('modelos/camion_797F.blend')?.asset.head_version === 4 && window.row('modelos/camion_797F.blend').status === 'ok', null, { timeout: 60000 });
+  step('Subir desde la ficha crea la v4 y B la recibe');
+
   assert.deepEqual(errors.filter((e) => !/409|423|Failed to load resource/.test(e)), []);
   console.log('\nTodo bien.');
 } finally {

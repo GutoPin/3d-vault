@@ -4,7 +4,7 @@ Registro de decisiones, cambios a la especificación original y resultados de la
 
 ## Estado de la Fase 0
 
-**Abierta, sin bloquear.** Falta medir guardados consecutivos reales de un mismo archivo. El responsable del proyecto pidió avanzar a la Fase 1 sin esa medición (2026-11-04). El diseño funciona con cualquier resultado; lo que queda sin confirmar es cuánto se ahorra entre versiones.
+**Cerrada con una primera medición (2026-11-06).** Guardados consecutivos reales con Blender 5.2 (ver "Guardados consecutivos"). Conclusión: conviene guardar **sin Comprimir**. Queda confirmarlo con archivos reales del equipo, en Blender 5.1.
 
 ## Mediciones de reutilización
 
@@ -31,15 +31,22 @@ Observaciones:
 
 Versiones: las cabeceras de los cuatro archivos son `BLENDER17-01v0501` (2) y `BLENDER17-01v0502` (2), con el formato introducido en Blender 5.0. El equipo usa Blender 5.1.
 
-### Guardados consecutivos
+### Guardados consecutivos (2026-11-06)
 
-Pendiente. Hace falta medir, con y sin *Compress*:
+Blender 5.2.3 (módulo `bpy` de PyPI) en esta laptop, sin interfaz. Escena sintética: 14 monos con subdivisión 4 aplicada. Cada guardado parte del primero; "otra sesión" es abrir el primero en un proceso nuevo y guardarlo sin cambios. Medido con `cdcmeasure`.
 
-- Dos guardados en la misma sesión de Blender.
-- Dos guardados en sesiones distintas, porque los punteros de memoria guardados pueden variar.
-- Una edición de geometría, y no solo de textos o ajustes.
+| Cambio respecto al primer guardado | Comprimido (67,7 MiB) | Sin comprimir (162,1 MiB) |
+|---|---:|---:|
+| Mover un objeto | 2,6 % a transferir | 0,7 % |
+| Editar 2 000 vértices de un objeto | **96,7 %** | **1,4 %** |
+| Guardar en otra sesión, sin cambios | 48,2 % | 10,1 % |
 
-Hasta tener estos datos no se recomienda activar ni desactivar *Compress*. Desactivarlo tiene un coste real: `ESCENA5` pasa de 1.67 a 3.00 GiB en cada PC.
+- **Con *Compress*, una edición de geometría cambia casi todo el archivo comprimido** desde ese punto. Sin comprimir, solo los trozos de ese objeto. Es la diferencia que decide el uso del disco del VPS: con versiones frecuentes, los archivos comprimidos ocupan casi su tamaño completo por versión.
+- El servidor guarda los trozos comprimidos con zstd, así que desactivar *Compress* no aumenta el espacio en el VPS por versión; sí ocupa unas 2,4 veces más en cada PC y en la primera subida.
+- Abrir y guardar en otra sesión cambia el 10 % sin comprimir: los punteros guardados cambian entre sesiones.
+- **Límites:** escena sintética, una sola edición, Blender 5.2 y no 5.1. Falta repetirlo con un archivo real del equipo y una edición típica.
+
+**Decisión:** se recomienda guardar sin Comprimir. El complemento de Blender lo detecta (cabecera zstd) y ofrece "Guardar sin comprimir"; la guía lo explica. No se fuerza: es una opción de cada archivo.
 
 ## Prueba de punta a punta de la Fase 1 (2026-11-04)
 
@@ -100,6 +107,8 @@ El agente Go (`internal/agent`, sin tests ni interfaz) queda en pausa, no se bor
 
 Velocidad del análisis en JavaScript (Node, esta laptop): corte 321 MiB/s, SHA-256 244 MiB/s, análisis completo 143 MiB/s, unos 15 s para un `.blend` de 2 GB.
 
+**Complemento de Blender** (`make test-blender-e2e`, Blender 5.2 sin interfaz contra el servidor): sin permiso de red no se conecta y dice dónde activarlo; agregar crea la v1; bloquear usa la identidad de Mi carpeta; guardar sin comprimir; guardar y subir crea la v2; otra usuaria sube la v3 y "Actualizar" deja el archivo idéntico y con su cilindro al abrirlo; bloquear lo que tiene otra falla con su nombre; con cambios locales, actualizar guarda la copia `*.conflicto-*`. Sin probar: el panel y las ventanas emergentes con interfaz, Windows, y Blender 5.1.
+
 **Sin probar:** arrastrar y soltar con un ratón de verdad (la copia que hace sí tiene prueba), instalar como aplicación y abrirla al iniciar sesión, los avisos de escritorio, Edge en Windows con una carpeta real (el selector no se puede automatizar), archivos de varios GB en el navegador y la pantalla en un teléfono, que no tiene la API.
 
 ## Web
@@ -131,7 +140,7 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | Estructura de la sección 10 de `PLAN.md`, sin librería de inyección de dependencias | La especificación ya fija la estructura y pide lo más simple: constructores manuales |
 | FastCDC adaptado en `internal/chunker`, sin depender de `jotfs/fastcdc-go` | Licencia Apache 2.0. Última versión de 2020 y un error de concurrencia abierto: modifica una tabla global al crear cada instancia |
 | Parámetros fijos y sin semilla en FastCDC | La semilla protege frente a ataques de huella por tamaño de trozo, algo que no aplica a un sistema interno. Los cortes quedan fijados por `TestGoldenCuts` |
-| El aviso de *Compress* en el agente queda en suspenso | Las primeras mediciones no justifican avisar. Se decide con los guardados consecutivos |
+| El complemento avisa si el archivo está comprimido y ofrece guardarlo sin comprimir | Ver "Guardados consecutivos": comprimido, una edición de geometría sube casi todo el archivo |
 | Sincronización en el navegador con File System Access API, en lugar del agente `.exe` | Ver "Cambio de plan". Sin instalar nada, sin firma |
 | JavaScript propio sin dependencias ni compilación: `core.js` (corte y SHA-256), `engine.js` (sincronización, sin DOM) y `app.js` (interfaz) | Pocas líneas. `engine.js` funciona con cualquier carpeta del navegador, lo que permite probarlo con OPFS |
 | SHA-256 incremental en JavaScript para el archivo completo y nativo (`crypto.subtle`) para cada trozo | `crypto.subtle` no es incremental y un `.blend` no cabe en memoria |
@@ -162,6 +171,17 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | Imágenes inline solo PNG, JPEG y WebP. SVG nunca | Un SVG puede llevar scripts |
 | three 0.170.0 incluido en el binario, con los `from 'three'` reescritos a rutas relativas | Sin CDN y sin relajar la CSP para scripts. La CSP solo añade `data:` y `blob:` en imágenes y conexiones, que necesitan los cargadores de `.glb` y `.fbx` |
 | Sin miniatura en la lista del proyecto | Probada: descuadraba los nombres y a 32 px no se distinguía |
+| Complemento de Blender sin agente local: habla con el servidor con un token | No hay programa instalado con el que hablar. El código de conexión lo genera Mi carpeta con la sesión del navegador, así Blender no ve la contraseña |
+| El código lleva la identidad de PC (`X-Client-Id`) de Mi carpeta | Un bloqueo hecho en Blender vale en Mi carpeta y al revés: son la misma PC |
+| El complemento corta los trozos en Python con numpy (incluido en Blender), con los mismos cortes que Go y JavaScript | Una ventana de 22 bytes calculada por duplicación en 5 pasadas: 85 MiB/s, unos 25 s para 2 GB. `test_vault.py` fija la misma huella y lo compara con FastCDC byte a byte |
+| Subir desde Blender exige tener el bloqueo, y la versión base es la última | Blender no sabe qué versión bajó Mi carpeta. Con el bloqueo nadie pudo subir encima |
+| El estado en Blender compara el SHA-256 del archivo con el historial del servidor | Distingue "al día", "versión anterior" (se puede actualizar copiando trozos) y "cambios sin subir" (se guarda copia de conflicto antes de actualizar) |
+| Las tareas de red del complemento van en un hilo y un temporizador de Blender las recoge | No congela Blender. En segundo plano (pruebas) son síncronas |
+| El complemento respeta "Permitir acceso en línea" de Blender | Lo exige Blender para las extensiones |
+| `/blender/3dvault.zip` se arma desde los archivos incluidos en el binario | El complemento siempre corresponde a la versión del servidor |
+| Licencia del complemento: GPL-3.0-or-later | Usa la API de Blender, que es GPL. Solo afecta al complemento |
+| Un archivo nuevo con el mismo contenido que uno que falta es un renombrado; se ofrece "Mover en el servidor" | Cumple "renombrar en el Explorador no bifurca el historial" sin propagar nada solo |
+| Subir desde la ficha o el proyecto con `pushFile`, compartida con Mi carpeta | Sirve en cualquier navegador. Usa la identidad de Mi carpeta solo si el bloqueo es de ella; si no, la de la web, igual que los botones de esa página |
 
 ## Cambios a la especificación
 

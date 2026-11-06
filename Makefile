@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e
+.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e test-blender test-blender-e2e
 
 # Limitado a 2 núcleos y prioridad baja: la máquina de desarrollo es modesta.
 LIMITS := GOMAXPROCS=2 nice -n 19
@@ -32,5 +32,14 @@ test-web:
 # Dos navegadores contra un servidor real. Requiere Node y Chromium (ver web/e2e).
 e2e: build-server
 	cd web/e2e && npm ci --silent && nice -n 19 node sync.e2e.mjs
+
+# Complemento de Blender. PY necesita numpy; la prueba dentro de Blender, además,
+# el módulo bpy (pip install bpy, Python 3.13).
+PY ?= python3
+test-blender:
+	$(PY) -m unittest web/blender/test_vault.py
+
+test-blender-e2e: build-server
+	nice -n 19 $(PY) web/blender/test_addon_blender.py
 
 check: vet test

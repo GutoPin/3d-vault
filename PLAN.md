@@ -242,6 +242,8 @@ Página Mi carpeta: elegir carpeta, sincronización selectiva por proyecto, baja
 Visor 3D, miniaturas `.blend`, `purge`, `gc`, `check`, uso de disco por proyecto. macOS queda cubierto por Chrome.
 
 ### Fase 4 — Opcional
+**Hecho (2026-11-06):** el complemento de Blender, que se conecta con un código generado en Mi carpeta y comparte su identidad de PC. Pendiente: menú contextual del Explorador y superposición de íconos, que necesitarían un programa instalado.
+
 Primero, el complemento de Blender (panel: estado, bloquear, subir con comentario, liberar; aviso al guardar si hay una versión más nueva). Sin agente local, hablaría con el servidor directamente. Menú contextual en el Explorador de Windows. Superposición de íconos de estado.
 
 ## 13. Fuera de alcance (por ahora)

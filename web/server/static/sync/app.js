@@ -11,6 +11,7 @@ const STATUS = {
   changed: 'Cambios sin subir',
   new: 'Nuevo, sin subir',
   missing: 'No está en tu carpeta',
+  moved: 'Renombrado o movido',
   error: 'Error',
 };
 
@@ -155,6 +156,11 @@ function rowActions(pid, row) {
   const a = row.asset;
   const lock = a?.lock;
   const out = [];
+  if (row.status === 'moved') {
+    out.push(actionButton('Mover en el servidor', 'move', pid, row.key, true));
+    out.push(actionButton('Agregar como nuevo…', 'upload', pid, row.key));
+    return out;
+  }
   if (row.status === 'new') out.push(actionButton('Agregar…', 'upload', pid, row.key, true));
   if (row.status === 'changed') out.push(actionButton('Subir…', 'upload', pid, row.key, true));
   if (row.status === 'missing') {
@@ -186,6 +192,8 @@ function statusCell(row) {
   const lock = row.asset?.lock;
   let owner = lock && !row.lockedByMe ? `Bloqueado por ${lock.display_name}${lock.user_id === ui.me.id ? ` en ${lock.client_name}` : ''}` : null;
   if (row.lockedByMe && row.status !== 'locked') owner = 'Bloqueado por ti';
+  if (row.status === 'changed' && !lock) owner = 'Sin bloquear: bloquéalo para que nadie suba encima.';
+  if (row.status === 'moved') owner = `Antes: ${row.from.asset.path}. Muévelo en el servidor para conservar su historial.`;
   return el('td', { class: row.status === 'error' ? 'sync-error' : '' }, text, owner && el('span', { class: 'sub' }, owner));
 }
 
@@ -201,7 +209,7 @@ function render() {
     const body = rows.map((row) => el('tr', {},
       el('td', {}, row.asset ? el('a', { class: 'name', href: `/assets/${row.asset.id}` }, row.asset.path) : el('span', { class: 'name' }, row.local.path)),
       el('td', { class: 'n' }, row.asset ? `v${row.asset.head_version}` : '—'),
-      el('td', { class: 'n' }, formatBytes(row.asset?.size_bytes ?? 0)),
+      el('td', { class: 'n' }, formatBytes(row.asset?.size_bytes ?? row.from?.asset.size_bytes ?? 0)),
       statusCell(row),
       el('td', { class: 'row-actions' }, ...rowActions(p.id, row)),
     ));
@@ -419,6 +427,27 @@ const actions = {
     await Notification.requestPermission();
     renderComforts();
   },
+  'blender-code': async () => {
+    try {
+      const name = `Blender · ${$('client-name').value.trim() || defaultClientName()}`;
+      const { token } = await ui.api.json('POST', '/api/tokens', { name });
+      const data = { s: location.origin, t: token, c: ui.clientId, n: $('client-name').value.trim() || defaultClientName() };
+      const raw = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(data))));
+      $('blender-code').value = `3DV1:${raw.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+      $('blender-code-row').hidden = false;
+      $('blender-code').select();
+    } catch (err) {
+      fail(err);
+    }
+  },
+  'copy-code': async () => {
+    await navigator.clipboard.writeText($('blender-code').value).catch(() => $('blender-code').select());
+    notice('Código copiado. Pégalo en las preferencias del complemento en Blender.', true);
+  },
+  move: (engine, row) => run(async () => {
+    await engine.move(row);
+    notice(`Movido en el servidor: ${row.from.asset.path} → ${row.local.path}. Conserva su historial.`, true);
+  }),
   restore: (engine, row) => run(() => engine.restoreMissing(row)),
   delete: (engine, row) => run(async () => {
     if (!confirm(`¿Borrar ${row.asset.path} del servidor? Desaparecerá de las PCs de todos. El administrador puede recuperarlo hasta la próxima limpieza.`)) return;

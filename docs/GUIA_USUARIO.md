@@ -42,6 +42,7 @@ En la tabla de cada proyecto ves el estado de cada archivo:
 | Cambios sin subir | Lo guardaste y el servidor aún no lo tiene | **Subir…** |
 | Nuevo, sin subir | Es un archivo que solo está en tu PC | **Agregar…** si es del proyecto |
 | No está en tu carpeta | Lo borraste o lo moviste | **Descargar** para recuperarlo |
+| Renombrado o movido | Le cambiaste el nombre o la carpeta en el Explorador | **Mover en el servidor**: conserva su historial y llega así a todos |
 
 ## Editar un archivo, paso a paso
 
@@ -56,11 +57,36 @@ Puedes subir varias versiones seguidas sin liberar: desmarca la casilla y libér
 
 **Para tener varias variantes** (baja, media y alta en detalle, por ejemplo), guárdalas como archivos distintos: `camion_bajo.blend`, `camion_alto.blend`. Las **versiones** de un mismo archivo son su historia: v1, v2, v3…
 
+## Trabajar desde Blender (recomendado)
+
+Con el complemento de 3D-Vault, todo se hace sin salir de Blender. Se instala una sola vez:
+
+1. En Mi carpeta, baja hasta **Comodidades → Conectar Blender** y pulsa **Descarga el complemento**.
+2. En Blender: **Editar → Preferencias → Complementos**, menú **⌄** arriba a la derecha → **Instalar desde el disco**, y elige el archivo descargado.
+3. En Mi carpeta pulsa **Generar código**, luego **Copiar**, y pégalo en **Código de conexión**, en las preferencias del complemento. Pulsa **Probar conexión**.
+4. Si Blender dice que no tiene permiso para conectarse: **Preferencias → Sistema → Red → Permitir acceso en línea**.
+
+Después, en la vista 3D pulsa **N** y abre la pestaña **3D-Vault**. Con un archivo de tu carpeta abierto verás:
+
+- Su estado: **Al día**, **Tienes la v3 · hay v5 de Juan**, o **Cambios sin subir**, y quién lo tiene bloqueado.
+- **Bloquear** y **Liberar**.
+- **Guardar y subir**: guarda, te pide el comentario y sube solo lo que cambió.
+- **Actualizar a v5**: baja la versión nueva y la abre. Si tenías cambios que el servidor no tiene, primero guarda tu copia como `*.conflicto-*`.
+- **Ver historial**: abre la ficha del archivo en la web.
+
+Además te avisa **al abrir** un archivo si hay una versión más nueva o si lo tiene otra persona, y **al guardar** si lo estás editando sin bloquearlo.
+
+## Guarda sin comprimir
+
+En Blender, **Archivo → Guardar como**, engranaje ⚙, desmarca **Comprimir**, y guarda. Con el archivo comprimido, cualquier cambio en la geometría obliga a subir el archivo casi entero; sin comprimir, solo lo que cambió, y cada versión ocupa mucho menos en el servidor. El complemento lo detecta y lo hace con un clic: **Guardar sin comprimir**. El archivo ocupa más en tu disco, pero sube mucho más rápido.
+
 ## Agregar archivos nuevos
 
 La forma más rápida: **arrastra los archivos o carpetas** desde el Explorador de Windows y suéltalos sobre la tabla del proyecto. Se copian a la carpeta del proyecto, con sus subcarpetas, y te pide un solo comentario para subirlos todos.
 
 También puedes copiar o guardar el archivo dentro de la carpeta del proyecto. En Mi carpeta aparece como **Nuevo, sin subir**. Pulsa **Agregar…**, escribe un comentario y listo: desde ese momento lo tienen todos.
+
+¿Estás en otra PC o sin Mi carpeta? En la página del proyecto, **Agregar archivos** sube desde cualquier navegador, y en la ficha de un archivo, **Subir nueva versión**.
 
 Si tienes varios archivos nuevos o cambiados, el botón **Subir todo** junto al nombre del proyecto los sube de una vez con el mismo comentario.
 
@@ -87,6 +113,8 @@ Pulsa el nombre de un archivo para abrir su ficha. Ahí ves la miniatura de los 
 **Dice que está abierta en otra pestaña.** Solo una pestaña sincroniza a la vez. Cierra la otra.
 
 **Dice que mi sesión terminó.** Vuelve a entrar con tu usuario y contraseña.
+
+**Le cambié el nombre a un archivo.** Mi carpeta lo detecta y te ofrece **Mover en el servidor**, que conserva todas sus versiones.
 
 **Borré un archivo sin querer.** Pulsa **Descargar** en su fila. Borrar en tu PC nunca lo borra del servidor.
 

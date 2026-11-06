@@ -22,3 +22,6 @@
 
 # Dependencias de la prueba de punta a punta
 /web/e2e/node_modules/
+
+# Python
+__pycache__/

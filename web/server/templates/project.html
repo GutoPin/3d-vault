@@ -49,6 +49,20 @@
     </div>
   </div>
 </div>
+
+<section class="settings-row">
+  <div>
+    <h2>Agregar archivos</h2>
+    <p>Desde cualquier navegador, sin carpeta conectada. En Mi carpeta también puedes arrastrarlos sobre el proyecto.</p>
+  </div>
+  <form class="panel form-grid" id="web-upload" data-project="{{.Data.Project.ID}}">
+    <div class="field wide"><label for="file">Archivos</label><input class="input file-input" id="file" name="file" type="file" multiple required></div>
+    <div class="field"><label for="folder">Carpeta dentro del proyecto</label><input class="input" id="folder" name="folder" placeholder="Por ejemplo modelos/camiones" maxlength="500"><span class="hint">Vacío: en la raíz del proyecto.</span></div>
+    <div class="field"><label for="comment">Comentario</label><input class="input" id="comment" name="comment" value="Primera versión" minlength="3" maxlength="500" required></div>
+    <div class="wide form-foot upload-foot"><span class="sub" data-status role="status"></span><button class="btn primary" type="submit">Agregar</button></div>
+  </form>
+</section>
+<script type="module" src="/static/upload.js"></script>
 {{end}}
 
 {{define "lock-mark"}}{{if .}}<span class="lock-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{.DisplayName}}</span>{{else}}<span class="free">Libre</span>{{end}}{{end}}

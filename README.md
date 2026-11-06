@@ -11,7 +11,8 @@ Sistema interno y autohospedado para guardar archivos 3D con historial de versio
 
 - **Fase 2, cambio de plan:** los modeladores sincronizan desde la web, en la página **Mi carpeta** (`/sync`) de Edge o Chrome. No se instala nada, así que Windows no tiene un `.exe` que bloquear. Probado de punta a punta con dos navegadores (`make e2e`).
 - **Fase 3:** `purge`, `gc` y la página Espacio para administrar el disco; visor 3D y miniaturas de `.blend`.
-- **Facilidades:** instalar como aplicación que se abre al iniciar Windows, arrastrar y soltar, Subir todo y avisos de escritorio.
+- **Facilidades:** instalar como aplicación que se abre al iniciar Windows, arrastrar y soltar, Subir todo, avisos de escritorio, detección de renombrados y subida desde cualquier navegador.
+- **Fase 4:** complemento de Blender (pestaña 3D-Vault, tecla N) para bloquear, guardar y subir, y actualizar sin salir de Blender. Se descarga desde Mi carpeta.
 
 Guías: [`docs/GUIA_USUARIO.md`](docs/GUIA_USUARIO.md) para modeladores y [`docs/ADMIN.md`](docs/ADMIN.md) para el administrador. El detalle y los resultados están en `docs/DECISIONES.md`.
 
@@ -48,4 +49,6 @@ make check                              # go vet y tests, con 2 núcleos y prior
 make test-race PKG=./internal/vault     # detector de carreras: pesado, mejor por paquete
 make test-web                           # núcleo de la sincronización web, con Node
 make e2e                                # dos navegadores contra un servidor real (Node y Chromium)
+make test-blender PY=...                # núcleo del complemento (Python con numpy)
+make test-blender-e2e PY=...            # el complemento dentro de Blender (módulo bpy) contra el servidor
 ```

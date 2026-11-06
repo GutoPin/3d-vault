@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"context"
@@ -16,6 +17,7 @@ import (
 	"net/netip"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1069,13 +1071,16 @@ func TestWebAssetActions(t *testing.T) {
 		t.Fatalf("bloquear = %d", resp.StatusCode)
 	}
 	resp, body = b.get(path)
-	wantPage(t, resp, body, http.StatusOK, "Liberar", "Navegador")
+	wantPage(t, resp, body, http.StatusOK, "Liberar", "Navegador", `id="web-upload"`, `data-lock-client="web"`)
 
 	// Otro usuario lo ve bloqueado y no tiene botón; un POST directo se rechaza.
 	other := e.newBrowser()
 	other.login("ana")
 	resp, body = other.get(path)
 	wantPage(t, resp, body, http.StatusOK, "Juan")
+	if strings.Contains(body, `id="web-upload"`) {
+		t.Fatal("Ana no debería poder subir lo que Juan tiene bloqueado")
+	}
 	if strings.Contains(body, "Liberar") || strings.Contains(body, "Forzar") || strings.Contains(body, ">Bloquear<") {
 		t.Fatal("Ana no debería tener acciones de bloqueo")
 	}
@@ -1296,5 +1301,30 @@ func TestLocalPathOnlyAllowsThisSite(t *testing.T) {
 		if got := localPath(next); got != want {
 			t.Errorf("localPath(%q) = %q, quiero %q", next, got, want)
 		}
+	}
+}
+
+func TestBlenderAddonZip(t *testing.T) {
+	t.Parallel()
+
+	e := newEnv(t)
+	b := e.newBrowser()
+	b.login("juan")
+	resp, body := b.get("/blender/3dvault.zip")
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "application/zip" {
+		t.Fatalf("zip = %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	zr, err := zip.NewReader(strings.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range zr.File {
+		names = append(names, f.Name)
+	}
+	slices.Sort(names)
+	// Blender espera el manifiesto en la raíz del .zip.
+	if want := []string{"__init__.py", "blender_manifest.toml", "vault.py"}; !slices.Equal(names, want) {
+		t.Fatalf("archivos = %v, quiero %v", names, want)
 	}
 }

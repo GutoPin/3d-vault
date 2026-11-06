@@ -188,6 +188,7 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Post("/logout", s.webLogout)
 		r.Get("/", s.webProjects)
 		r.Get("/sync", s.webSync)
+		r.Get("/blender/3dvault.zip", s.blenderAddon)
 		r.Post("/projects", s.webCreateProject)
 		r.Get("/projects/{id}", s.webProject)
 		r.Get("/assets/{id}", s.webAsset)

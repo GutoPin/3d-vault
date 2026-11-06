@@ -330,7 +330,7 @@ details.inline-form[open] { margin-bottom: var(--gap); }
 
 /* ---------- Mi carpeta (sincronización desde el navegador) ---------- */
 [hidden] { display: none !important; }
-.steps { display: grid; gap: 10px; margin: 0 0 16px; padding-left: 20px; }
+ol.steps { display: grid; gap: 10px; margin: 0 0 16px; padding-left: 20px; list-style: decimal; }
 .check-list { display: grid; gap: 10px; }
 textarea.input { height: auto; padding: 8px 12px; resize: vertical; font: inherit; }
 td progress { display: block; width: 100%; max-width: 160px; height: 6px; margin-top: 4px; accent-color: var(--accent); }
@@ -365,3 +365,10 @@ dialog::backdrop { background: rgb(10 10 10 / 0.35); }
 .viewer-large[hidden] { display: none; }
 .viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 53px; padding: 8px var(--card-pad); border-top: 1px solid var(--border); }
 .viewer-note { color: var(--muted); }
+ol.steps-small { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; list-style: decimal; }
+.comfort > .btn { white-space: nowrap; }
+.code-row { display: flex; gap: 8px; margin-top: 10px; }
+.code-row .input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: var(--fs-small); }
+.comfort { align-items: flex-start; }
+.file-input { height: auto; padding: 8px 12px; }
+.upload-foot { align-items: center; justify-content: space-between; gap: 12px; }

@@ -83,6 +83,20 @@
         <p class="sub">Te avisa cuando llega una versión nueva o hay un conflicto, aunque estés en Blender. <span id="notify-state"></span></p>
       </div>
       <button class="btn" type="button" data-action="notify" id="notify-btn" hidden>Activar avisos</button></div>
+      <div class="comfort" id="blender"><div>
+        <b>Conectar Blender</b>
+        <p class="sub">Un panel dentro de Blender (tecla N → 3D-Vault) para bloquear, guardar y subir, y actualizar, sin salir de Blender. Te avisa al abrir un archivo si hay una versión más nueva o lo tiene otro.</p>
+        <ol class="sub steps-small">
+          <li><a class="text-action" href="/blender/3dvault.zip">Descarga el complemento</a>.</li>
+          <li>En Blender: <b>Editar → Preferencias → Complementos</b>, menú <b>⌄</b> arriba a la derecha → <b>Instalar desde el disco</b>, y elige el archivo descargado.</li>
+          <li>Pulsa <b>Generar código</b>, cópialo y pégalo en las preferencias del complemento. Blender no guarda tu contraseña.</li>
+        </ol>
+        <div class="code-row" id="blender-code-row" hidden>
+          <input class="input" id="blender-code" readonly aria-label="Código de conexión para Blender">
+          <button class="btn" type="button" data-action="copy-code">Copiar</button>
+        </div>
+      </div>
+      <button class="btn" type="button" data-action="blender-code">Generar código</button></div>
     </div>
   </section>
 
