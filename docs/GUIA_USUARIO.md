@@ -118,6 +118,12 @@ Para evitarlo: **bloquea siempre antes de editar**.
 
 Pulsa el nombre de un archivo para abrir su ficha. Ahí ves la miniatura de los `.blend` (si se guardaron con vista previa), las imágenes, y los `.glb`, `.gltf`, `.fbx`, `.obj` y `.stl` en 3D: arrastra para girar, rueda para acercar y **Encuadrar** para volver a la vista inicial. También está el historial con quién subió cada versión, cuándo, su comentario y cuánto cambió. Puedes **Descargar** cualquier versión o **Restaurarla**, lo que crea una versión nueva igual a la antigua, sin borrar nada.
 
+## Mi cuenta, actividad y búsqueda
+
+- **Mi cuenta** (tu nombre, abajo a la izquierda): cambia tu contraseña la primera vez que entres. También ves tus **conexiones de Blender** (puedes revocar la de una PC que ya no uses) y **todos tus bloqueos**, de todos los proyectos, con un botón para liberarlos. Al cambiar la contraseña, Blender deja de estar conectado: genera un código nuevo en Mi carpeta.
+- **Actividad**: quién subió, bloqueó, liberó o movió qué y cuándo. Puedes filtrar por proyecto y por persona.
+- **Buscar** (arriba a la izquierda): encuentra un archivo en todos los proyectos por parte de su nombre o carpeta, sin importar mayúsculas ni acentos.
+
 ## Preguntas frecuentes
 
 **¿Por qué no es un programa instalable?** Windows bloquea los programas que no están firmados con un certificado pagado. Desde el navegador no hace falta instalar nada y no hay nada que bloquear.

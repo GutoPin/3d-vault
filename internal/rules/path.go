@@ -52,9 +52,15 @@ func NormalizePath(raw string) (Path, error) {
 	}
 	return Path{
 		Clean: clean,
-		Key:   norm.NFC.String(cases.Fold().String(clean)),
+		Key:   FoldKey(clean),
 		Ext:   strings.ToLower(path.Ext(clean)),
 	}, nil
+}
+
+// FoldKey quita las mayúsculas y unifica la forma de los acentos, como Key. Sirve
+// para comparar un texto con las claves guardadas.
+func FoldKey(s string) string {
+	return norm.NFC.String(cases.Fold().String(norm.NFC.String(s)))
 }
 
 func checkSegment(segment string) error {

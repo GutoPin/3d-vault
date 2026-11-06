@@ -1,0 +1,95 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="title-row">
+  <div>
+    <h1>Mi cuenta</h1>
+    <p class="sub">{{.User.DisplayName}}, usuario {{.User.Username}}.</p>
+  </div>
+</div>
+
+{{if $d.PasswordChanged}}<p class="notice ok" role="status">Contraseña cambiada. Los códigos de conexión de Blender dejaron de valer: genera uno nuevo en <a href="/sync"><b>Mi carpeta</b></a> y pégalo en Blender.</p>{{end}}
+
+<div class="ledger-head">
+  <h2>Mis bloqueos</h2>
+  <p>Mientras un archivo esté bloqueado por ti, nadie más puede subir versiones. Libera los que ya no estés editando.</p>
+</div>
+<div class="panel table-panel">
+  {{if $d.Locks}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Archivo</th><th>Proyecto</th><th>PC</th><th class="n">Desde</th><th></th></tr></thead>
+      <tbody>
+      {{range $d.Locks}}
+        <tr>
+          <td class="path"><a class="name" href="/assets/{{.ID}}">{{.Path}}</a></td>
+          <td>{{.ProjectName}}</td>
+          <td data-label="En:">{{.Lock.ClientName}}</td>
+          <td class="n" data-label="Desde:">{{when .Lock.LockedAt}}{{if .Stale}} <span class="pill warn">Más de 2 días</span>{{end}}</td>
+          <td class="row-actions">
+            <form method="post" action="/assets/{{.ID}}/unlock">
+              <input type="hidden" name="next" value="/account">
+              <button class="text-action" type="submit">Liberar</button>
+            </form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">No tienes archivos bloqueados.</p>
+  {{end}}
+</div>
+
+<div class="ledger-head">
+  <h2>Mis conexiones</h2>
+  <p>Cada código de Blender que generas en Mi carpeta aparece aquí como «Blender · nombre de la PC». Revoca los de PC que ya no uses.</p>
+</div>
+<div class="panel table-panel">
+  {{if $d.Tokens}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Nombre</th><th class="n">Creada</th><th class="n">Último uso</th><th></th></tr></thead>
+      <tbody>
+      {{range $d.Tokens}}
+        <tr>
+          <td><span class="name">{{.Name}}</span></td>
+          <td class="n" data-label="Creada:">{{when .CreatedAt}}</td>
+          <td class="n" data-label="Último uso:">{{with .LastUsedAt}}{{when .}}{{else}}Nunca{{end}}</td>
+          <td class="row-actions">
+            <form method="post" action="/account/tokens/{{.ID}}/revoke"><button class="text-action" type="submit">Revocar</button></form>
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">No tienes conexiones. Para conectar Blender, genera un código en Mi carpeta.</p>
+  {{end}}
+</div>
+
+<section class="settings-row">
+  <div>
+    <h2>Cambiar mi contraseña</h2>
+    <p>Seguirás dentro en este navegador. En el resto tendrás que entrar de nuevo, y los códigos de Blender dejarán de valer.</p>
+  </div>
+  <form class="panel form-grid" method="post" action="/account/password">
+    <div class="field wide">
+      <label for="current">Contraseña actual</label>
+      <input class="input" id="current" name="current" type="password" required autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label for="password">Contraseña nueva</label>
+      <input class="input" id="password" name="password" type="password" required minlength="10" autocomplete="new-password" aria-describedby="password-hint">
+      <span class="hint" id="password-hint">Al menos 10 caracteres.</span>
+    </div>
+    <div class="field">
+      <label for="confirm">Repite la nueva</label>
+      <input class="input" id="confirm" name="confirm" type="password" required minlength="10" autocomplete="new-password" aria-describedby="confirm-hint">
+      <span class="hint" id="confirm-hint">La misma, para evitar errores.</span>
+    </div>
+    <div class="wide form-foot"><button class="btn primary" type="submit">Cambiar contraseña</button></div>
+  </form>
+</section>
+{{end}}

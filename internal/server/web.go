@@ -44,7 +44,7 @@ func loadPages() (*pageSet, error) {
 		"when":          func(t time.Time) string { return formatWhen(t, time.Now()) },
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -188,6 +188,11 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Post("/logout", s.webLogout)
 		r.Get("/", s.webProjects)
 		r.Get("/sync", s.webSync)
+		r.Get("/account", s.webAccount)
+		r.Post("/account/password", s.webChangePassword)
+		r.Post("/account/tokens/{id}/revoke", s.webRevokeToken)
+		r.Get("/activity", s.webActivity)
+		r.Get("/search", s.webSearch)
 		r.Get("/blender/3dvault.zip", s.blenderAddon)
 		r.Get("/blender/version", s.blenderVersion)
 		r.Post("/projects", s.webCreateProject)
@@ -594,7 +599,12 @@ func (s *Server) assetAction(w http.ResponseWriter, r *http.Request, action func
 		s.webFail(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/assets/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	target := "/assets/" + strconv.FormatInt(id, 10)
+	// Mi cuenta libera bloqueos con este mismo formulario y pide volver allí.
+	if next := r.PostForm.Get("next"); next != "" {
+		target = localPath(next)
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
 func (s *Server) webLock(w http.ResponseWriter, r *http.Request) {

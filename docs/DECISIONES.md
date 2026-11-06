@@ -188,6 +188,12 @@ Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se
 | La prueba del complemento ejecuta los `draw` del panel con una maqueta de layout que valida íconos y operadores | Sin interfaz, un nombre de ícono u operador equivocado solo fallaría en la Blender real |
 | "Arreglar texturas" en Blender: copia a `texturas/` del proyecto las imágenes de fuera, pone rutas relativas y sube las nuevas | Cada PC tiene la carpeta raíz en otro sitio: una ruta absoluta o una imagen en Descargas se ve rosa en las demás. Si ya existe una textura con ese nombre y otro contenido, se añade un sufijo |
 | El complemento revisa cada minuto el archivo abierto y avisa si otra persona subió una versión | Funciona sin Mi carpeta abierta. Reutiliza la revisión normal: unas pocas peticiones por minuto |
+| Mi cuenta: la contraseña actual se comprueba con el mismo límite de intentos que el login; tras cambiarla se emite una cookie nueva | Adivinar desde Mi cuenta cuenta igual que desde el login. Quien la cambia sigue dentro; las demás sesiones y los tokens dejan de valer |
+| Desde Mi cuenta solo se revocan las conexiones propias, también siendo admin | Evita revocar la de otro por error |
+| Liberar desde Mi cuenta usa la misma acción que la ficha, con `next` (pasado por `localPath`) para volver | Sin una acción nueva |
+| La actividad muestra solo acciones de proyectos y archivos, en español; los archivos borrados sin enlace | Las cuentas y tokens son ruido y en parte privados. El texto sale de `vault.describeActivity`, junto a donde se escribe el `detail` |
+| Actividad paginada con `before=<id>`, 50 por página, sin índices nuevos | Se añaden si se vuelve lenta |
+| La búsqueda global ignora mayúsculas y acentos, filtrando en Go, máximo 100 resultados | Un modelador escribe "camion" para "Camión". `LIKE '%x%'` también recorre toda la tabla, así que filtrar en Go no cuesta más |
 | Modo oscuro que sigue la preferencia del sistema, redefiniendo los tokens de color | Toda la interfaz usa variables. Sin interruptor propio: el sistema ya lo tiene. Revisado con capturas de Mi carpeta y de la ficha con visor |
 | Buscador y "Solo lo que necesita algo de mí" en Mi carpeta, en el navegador | Filtra las filas que ya están en memoria |
 | Subir desde la ficha o el proyecto con `pushFile`, compartida con Mi carpeta | Sirve en cualquier navegador. Usa la identidad de Mi carpeta solo si el bloqueo es de ella; si no, la de la web, igual que los botones de esa página |

@@ -109,7 +109,18 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | Con el archivo abierto en Blender, subir una versión desde la otra PC y esperar un minuto | Ventana en Blender: "… subió la vN de este archivo" |
 | Bloquear, añadir a un material una imagen de Descargas y guardar | Aviso de imágenes que no viajarán bien; **Arreglar texturas** las copia a `texturas/`, deja la ruta relativa y las sube |
 
-## 8. Administración
+## 8. Cuenta, actividad y búsqueda
+
+| Prueba | Debe pasar |
+|---|---|
+| Como `ana`: tu nombre abajo → **Mi cuenta** → cambiar contraseña con la actual mal | Error. Con 5 fallos seguidos, espera obligatoria |
+| Cambiarla bien | Sigues dentro. Avisa de generar un código nuevo para Blender, y el de antes deja de funcionar |
+| **Mis conexiones** → Revocar | Desaparece. Blender con ese código dice que la conexión ya no es válida |
+| **Mis bloqueos** | Todos tus bloqueos de todos los proyectos; "Liberar" vuelve a Mi cuenta |
+| **Actividad**, filtrar por proyecto y por persona; "Ver más" | Subidas, bloqueos, movimientos, pedidos de liberar… en español |
+| Buscar `CAMION` y `camion` | Encuentra `camion.blend` y cualquier `Camión…` |
+
+## 9. Administración
 
 | Prueba | Debe pasar |
 |---|---|

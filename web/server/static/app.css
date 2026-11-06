@@ -401,3 +401,13 @@ ol.steps-small { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; l
   }
   dialog::backdrop { background: rgb(0 0 0 / 0.6); }
 }
+
+
+/* ---------- Mi cuenta, actividad y búsqueda ---------- */
+.side-search { margin: 8px 0 10px; }
+.side-search .input { width: 100%; height: var(--control-height); }
+a.who { padding: 4px 8px; margin: -4px -8px; border-radius: 8px; }
+a.who:hover, a.who[aria-current="page"] { background: var(--raised); }
+.filters select.input { height: var(--control-height); max-width: 100%; }
+.more { display: flex; justify-content: center; margin-top: var(--gap); }
+.nowrap { white-space: nowrap; }

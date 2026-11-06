@@ -143,7 +143,7 @@ No hay nada que instalar: todo se hace en Edge o Chrome, así que Windows no tie
 
 - **Siempre hay que bloquear antes de editar.** Si dos editan a la vez sin bloquear, no se pierde nada (queda una copia `*.conflicto-*`), pero hay que unir los cambios a mano.
 - **La actualización automática funciona con la pestaña de Mi carpeta abierta.** Con la pestaña cerrada, los archivos siguen ahí y se ponen al día al volver a abrirla.
-- **Nadie puede cambiar su propia contraseña:** lo haces tú en **Usuarios**, y eso cierra su sesión.
+- **Que cada uno cambie su contraseña** al entrar la primera vez, en **Mi cuenta** (su nombre, abajo a la izquierda). Si alguien la olvida, la cambias tú en **Usuarios**.
 
 ## Para actualizar más adelante
 

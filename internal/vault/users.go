@@ -374,3 +374,35 @@ func (s *Service) UserByToken(ctx context.Context, plain string) (User, bool, er
 	}
 	return u, true, nil
 }
+
+// ListTokens devuelve los tokens vigentes de un usuario, el más nuevo primero.
+func (s *Service) ListTokens(ctx context.Context, userID int64) ([]Token, error) {
+	tokens := []Token{}
+	err := s.db.ReadTx(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `
+			SELECT id, name, created_at, last_used_at FROM api_tokens
+			WHERE user_id = ? AND revoked_at IS NULL ORDER BY id DESC`, userID)
+		if err != nil {
+			return fmt.Errorf("listar tokens: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var (
+				t         = Token{UserID: userID}
+				createdAt int64
+				lastUsed  sql.NullInt64
+			)
+			if err := rows.Scan(&t.ID, &t.Name, &createdAt, &lastUsed); err != nil {
+				return fmt.Errorf("leer token: %w", err)
+			}
+			t.CreatedAt = fromMillis(createdAt)
+			if lastUsed.Valid {
+				used := fromMillis(lastUsed.Int64)
+				t.LastUsedAt = &used
+			}
+			tokens = append(tokens, t)
+		}
+		return rows.Err()
+	})
+	return tokens, err
+}

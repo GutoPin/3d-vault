@@ -1,0 +1,41 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="title-row">
+  <div>
+    <h1>Buscar</h1>
+    <p class="sub">{{if not $d.Query}}Busca archivos por nombre o carpeta en todos los proyectos.{{else if $d.Limited}}Se muestran los primeros 100. Escribe algo más concreto para ver el resto.{{else}}{{len $d.Rows}} {{if eq (len $d.Rows) 1}}archivo encontrado{{else}}archivos encontrados{{end}}.{{end}}</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <form method="get" action="/search" role="search">
+    <input class="input" type="search" name="q" value="{{$d.Query}}" placeholder="Nombre o carpeta" aria-label="Buscar archivos">
+    <button class="btn" type="submit">Buscar</button>
+  </form>
+</div>
+
+{{if $d.Query}}
+<div class="panel table-panel">
+  {{if $d.Rows}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Archivo</th><th>Proyecto</th><th class="n">Versión</th><th class="n">Tamaño</th><th>Bloqueo</th></tr></thead>
+      <tbody>
+      {{range $d.Rows}}
+        <tr>
+          <td class="path"><a class="name" href="/assets/{{.ID}}">{{.Path}}</a></td>
+          <td><a href="/projects/{{.ProjectID}}">{{.ProjectName}}</a></td>
+          <td class="n" data-label="Versión:">v{{.HeadVersion}}</td>
+          <td class="n" data-label="Tamaño:">{{formatBytes .SizeBytes}}</td>
+          <td>{{with .Lock}}<span class="lock-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{.DisplayName}}</span>{{else}}<span class="free">Libre</span>{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">Ningún archivo coincide con «{{$d.Query}}».</p>
+  {{end}}
+</div>
+{{end}}
+{{end}}
