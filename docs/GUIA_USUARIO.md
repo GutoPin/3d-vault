@@ -26,6 +26,8 @@ Dentro de tu carpeta aparece una carpeta por proyecto, con todos sus archivos.
 3. Escribe `edge://apps` en la barra de direcciones de Edge, haz clic derecho sobre 3D-Vault y marca **Iniciar automáticamente al iniciar sesión**.
 4. En **Comodidades**, pulsa **Activar avisos**. Windows te avisará cuando un compañero suba una versión nueva, aunque estés en Blender.
 
+Si usas una pestaña en vez de la aplicación: Edge "duerme" las pestañas que no usas y entonces deja de sincronizar. Evítalo en `edge://settings/system` → **Optimizar el rendimiento** → **Nunca poner en suspensión estos sitios** → agrega la dirección de 3D-Vault.
+
 Desde entonces, al encender la PC 3D-Vault se abre solo. Puedes minimizar la ventana y olvidarte. Si la sesión venció, te pedirá tu contraseña y volverá a Mi carpeta.
 
 ## Mientras trabajas
