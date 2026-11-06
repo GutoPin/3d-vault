@@ -236,6 +236,43 @@ def run(data):
     assert len(copies) == 1 and vault.file_sha256(path) == vault.file_sha256(other_path), copies
     step(f"Conflicto sin pérdida: queda {os.path.basename(copies[0])} y la v4 de Ana")
 
+    # Ana sube una versión mientras Guto tiene el archivo abierto: la revisión
+    # periódica lo avisa en Blender.
+    addon.refresh()
+    assert st["status"]["state"] == "current", st["status"]
+    head = st["status"]["asset"]["head_version"]
+    other.lock(other.status(other_path))
+    with open(other_path, "ab") as f:
+        f.write(b"cambio de Ana")
+    other.upload(other_path, other.status(other_path), "Otro cambio de Ana", True)
+    addon.check_remote()
+    assert st["notice"] == f"Ana subió la v{head + 1} de este archivo. Pulsa Actualizar para tenerla.", st["notice"]
+    step(f"Aviso en Blender sin Mi carpeta: «{st['notice']}»")
+    bpy.ops.three_d_vault.update()
+
+    # Una textura fuera del proyecto: se copia, queda con ruta relativa y se sube.
+    outside = os.path.join(data, "Descargas", "chapa.png")
+    os.makedirs(os.path.dirname(outside))
+    img = bpy.data.images.new("chapa", 8, 8)
+    img.filepath_raw = outside
+    img.file_format = "PNG"
+    img.save()
+    material = bpy.data.materials.new("Chapa")
+    material.use_nodes = True
+    node = material.node_tree.nodes.new("ShaderNodeTexImage")
+    node.image = img
+    bpy.data.objects[0].data.materials.append(material)
+    addon.refresh()
+    bpy.ops.three_d_vault.lock()
+    assert len(addon.outside_files(st["status"])) == 1 and "[three_d_vault.fix_textures]" in draw_panels()
+    bpy.ops.three_d_vault.fix_textures()
+    copied = os.path.join(data, "3D-Vault", "Camiones", "texturas", "chapa.png")
+    assert os.path.isfile(copied) and img.filepath == "//../texturas/chapa.png", (img.filepath, st["error"])
+    assert addon.outside_files(st["status"]) == []
+    paths = [a["path"] for a in call("GET", "/api/projects/1/snapshot", token=guto)["assets"]]
+    assert "texturas/chapa.png" in paths, paths
+    step(f"Arreglar texturas: {st['notice']}")
+
     vault.own_version = lambda: "0.9.0"
     st["addon_update"] = None
     addon.refresh()

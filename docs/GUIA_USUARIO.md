@@ -78,6 +78,10 @@ Después, en la vista 3D pulsa **N** y abre la pestaña **3D-Vault**. Con un arc
 - **Pedir que lo libere**, si lo tiene otra persona.
 - **Versiones** (despliégalo): todas las versiones con su autor, fecha y comentario. El botón de ventana de cada una la **abre aparte**, en otra ventana de Blender, para compararla con la tuya sin tocar tu archivo.
 
+**Texturas:** si el archivo usa imágenes que están fuera de la carpeta del proyecto (por ejemplo en Descargas) o con ruta absoluta, en las PCs de tus compañeros se verían rosas. El panel lo avisa: pulsa **Arreglar texturas** y las copia a la carpeta `texturas` del proyecto, deja las rutas bien y las sube. Después sube el `.blend`.
+
+Con Blender abierto, cada minuto revisa si alguien subió una versión nueva del archivo que tienes abierto y te avisa, aunque no tengas Mi carpeta abierta.
+
 Si el complemento se queda viejo, el panel lo avisa con un botón para bajar el nuevo: instálalo igual que la primera vez.
 
 Además te avisa **al abrir** un archivo si hay una versión más nueva o si lo tiene otra persona, y **al guardar** si lo estás editando sin bloquearlo.

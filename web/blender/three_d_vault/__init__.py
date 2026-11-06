@@ -6,6 +6,7 @@ también allí. La lógica está en vault.py; aquí solo está la interfaz.
 """
 
 import os
+import shutil
 import subprocess
 import tempfile
 import textwrap
@@ -115,15 +116,56 @@ def progress(what, done, total=0):
     STATE["progress"] = (what, done, total)
 
 
-def refresh(alert=False, after_save=False):
+REMOTE_EVERY = 60  # segundos entre revisiones de versiones nuevas
+
+
+def project_root(st):
+    """La carpeta del proyecto en esta PC: la ruta del archivo sin su ruta en el proyecto."""
+    full = os.path.normpath(bpy.data.filepath)
+    rel = os.path.normpath(st["path"].replace("/", os.sep))
+    return full[: len(full) - len(rel)].rstrip(os.sep)
+
+
+def outside_files(st):
+    """Imágenes que no viajan bien con el .blend: fuera del proyecto, o con
+    ruta absoluta, que en otra PC apunta a otra carpeta."""
+    root = os.path.normcase(project_root(st)) + os.sep
+    out = []
+    for img in bpy.data.images:
+        if img.source not in {"FILE", "SEQUENCE", "TILED"} or img.packed_file or not img.filepath:
+            continue
+        absolute = os.path.normpath(bpy.path.abspath(img.filepath))
+        inside = os.path.normcase(absolute).startswith(root)
+        if not inside or not img.filepath.startswith("//"):
+            out.append((img, absolute, inside))
+    return out
+
+
+def check_remote():
+    """Revisa cada minuto si alguien subió una versión del archivo abierto."""
+    st = STATE["status"]
+    if st and st.get("asset") and not STATE["busy"] and STATE["path"] == bpy.data.filepath and bpy.app.online_access:
+        refresh(remote=True)
+    return REMOTE_EVERY
+
+
+def refresh(alert=False, after_save=False, remote=False):
     path = bpy.data.filepath
     STATE["path"] = path
     if not path or not prefs().code.strip():
         STATE["status"] = None
         return
 
+    before = STATE["status"]
+
     def done(st):
         STATE["status"] = st
+        if remote and before and st.get("asset") and before.get("asset"):
+            head, old = st["asset"], before["asset"]
+            if head["head_version"] > old["head_version"] and head["uploaded_by"] != get_vault().me()["display_name"]:
+                text = f"{head['uploaded_by']} subió la v{head['head_version']} de este archivo."
+                STATE["notice"] = text + " Pulsa Actualizar para tenerla."
+                popup("3D-Vault", [text, "Pulsa Actualizar en el panel 3D-Vault (tecla N)."], "INFO")
         if alert:
             alert_on_open(st)
         if after_save:
@@ -340,6 +382,57 @@ class THREEDVAULT_OT_open_version(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class THREEDVAULT_OT_fix_textures(bpy.types.Operator):
+    bl_idname = "three_d_vault.fix_textures"
+    bl_label = "Arreglar texturas"
+    bl_description = "Copiar al proyecto (carpeta texturas) las imágenes que están fuera, usar rutas relativas, guardar y subir las texturas nuevas"
+
+    def execute(self, _context):
+        st = STATE["status"]
+        root = project_root(st)
+        copied, missing = [], []
+        for img, absolute, inside in outside_files(st):
+            if not inside:
+                if not os.path.isfile(absolute):
+                    missing.append(img.name)
+                    continue
+                folder = os.path.join(root, "texturas")
+                os.makedirs(folder, exist_ok=True)
+                stem, ext = os.path.splitext(os.path.basename(absolute))
+                dest, n = os.path.join(folder, stem + ext), 1
+                while os.path.exists(dest) and vault.file_sha256(dest) != vault.file_sha256(absolute):
+                    n += 1
+                    dest = os.path.join(folder, f"{stem}-{n}{ext}")
+                if not os.path.exists(dest):
+                    shutil.copy2(absolute, dest)
+                copied.append(dest)
+                absolute = dest
+            img.filepath = bpy.path.relpath(absolute)
+        STATE["saving_to_upload"] = True
+        bpy.ops.wm.save_mainfile()
+        name = os.path.basename(bpy.data.filepath)
+
+        def work():
+            v = get_vault()
+            sent = 0
+            for path in copied:
+                tst = v.status(path)
+                if tst["state"] == "new":
+                    v.upload(path, tst, f"Textura de {name}", False, progress)
+                    sent += 1
+            return sent
+
+        def done(sent):
+            text = f"Texturas arregladas: {len(copied)} copiadas a texturas/ ({sent} subidas) y rutas relativas."
+            if missing:
+                text += f" No se encontraron: {', '.join(missing)}."
+            STATE["notice"] = text + " Ahora sube el .blend."
+            refresh()
+
+        run_job("Subiendo texturas", work, done)
+        return {"FINISHED"}
+
+
 class THREEDVAULT_OT_uncompress(bpy.types.Operator):
     bl_idname = "three_d_vault.save_uncompressed"
     bl_label = "Guardar sin comprimir"
@@ -472,6 +565,15 @@ class THREEDVAULT_PT_panel(bpy.types.Panel):
             else:
                 col.operator("three_d_vault.request_unlock", icon="HAND")
 
+        outside = outside_files(st)
+        if outside and (not asset or st.get("locked_by_me")):
+            tip = layout.box()
+            away = sum(1 for _, _, inside in outside if not inside)
+            text = f"{len(outside)} imagen(es) no viajarán bien con el archivo"
+            text += f" ({away} fuera del proyecto)" if away else " (rutas absolutas)"
+            wrapped(tip, text + ": en otras PCs se verían rosas.", "ERROR")
+            tip.operator("three_d_vault.fix_textures", icon="TEXTURE")
+
         if st.get("compressed") and (not asset or st.get("locked_by_me")):
             tip = layout.box()
             wrapped(tip, "Este archivo está comprimido: cada cambio de geometría sube casi el archivo entero. Sin comprimir, solo lo que cambió.", "INFO")
@@ -558,7 +660,7 @@ def on_save(_dummy):
 CLASSES = (
     THREEDVAULT_OT_refresh, THREEDVAULT_OT_lock, THREEDVAULT_OT_unlock, THREEDVAULT_OT_upload,
     THREEDVAULT_OT_update, THREEDVAULT_OT_uncompress, THREEDVAULT_OT_open_web, THREEDVAULT_OT_test, THREEDVAULT_OT_request,
-    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_PT_panel, THREEDVAULT_PT_versions,
+    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_OT_fix_textures, THREEDVAULT_PT_panel, THREEDVAULT_PT_versions,
     THREEDVAULT_Preferences,
 )
 
@@ -568,9 +670,12 @@ def register():
         bpy.utils.register_class(cls)
     bpy.app.handlers.load_post.append(on_load)
     bpy.app.handlers.save_post.append(on_save)
+    bpy.app.timers.register(check_remote, first_interval=REMOTE_EVERY, persistent=True)
 
 
 def unregister():
+    if bpy.app.timers.is_registered(check_remote):
+        bpy.app.timers.unregister(check_remote)
     for handlers, fn in ((bpy.app.handlers.load_post, on_load), (bpy.app.handlers.save_post, on_save)):
         if fn in handlers:
             handlers.remove(fn)

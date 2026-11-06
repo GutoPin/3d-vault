@@ -106,6 +106,8 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | Archivo comprimido (ábrelo desde `para-versiones` copiado al proyecto) | Sugiere **Guardar sin comprimir** |
 | Desplegar **Versiones** y pulsar el botón de ventana de una anterior | Se abre otra ventana de Blender con esa versión; tu archivo no cambia |
 | Con el archivo bloqueado por otro: **Pedir que lo libere** | Le llega el aviso en su Mi carpeta |
+| Con el archivo abierto en Blender, subir una versión desde la otra PC y esperar un minuto | Ventana en Blender: "… subió la vN de este archivo" |
+| Bloquear, añadir a un material una imagen de Descargas y guardar | Aviso de imágenes que no viajarán bien; **Arreglar texturas** las copia a `texturas/`, deja la ruta relativa y las sube |
 
 ## 8. Administración
 
