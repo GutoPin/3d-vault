@@ -323,6 +323,7 @@ func (s *Service) CreateAsset(ctx context.Context, actor rules.Actor, in CreateA
 	if !result.NoChanges {
 		s.hub.Notify()
 		s.thumbnailLater(result.Asset, result.Version)
+		s.refsLater(result.Asset, result.Version)
 	}
 	return result, nil
 }
@@ -443,6 +444,7 @@ func (s *Service) CommitVersion(ctx context.Context, actor rules.Actor, in Commi
 	if !done {
 		s.hub.Notify()
 		s.thumbnailLater(result.Asset, result.Version)
+		s.refsLater(result.Asset, result.Version)
 	}
 	return result, nil
 }
@@ -516,6 +518,7 @@ func (s *Service) Restore(ctx context.Context, actor rules.Actor, assetID, numbe
 	if !done {
 		s.hub.Notify()
 		s.thumbnailLater(result.Asset, result.Version)
+		s.refsLater(result.Asset, result.Version)
 	}
 	return result, nil
 }

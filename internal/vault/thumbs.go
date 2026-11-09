@@ -69,9 +69,11 @@ func (s *Service) HasThumbnail(ctx context.Context, v Version) (bool, error) {
 	return err == nil, err
 }
 
-// WaitBackground espera a que terminen las miniaturas en curso. Se llama al
-// detener el servidor, antes de cerrar el almacén.
+// WaitBackground corta los análisis de enlaces y espera a que terminen las
+// miniaturas en curso. Se llama al detener el servidor, antes de cerrar el
+// almacén.
 func (s *Service) WaitBackground() {
+	s.stopBg()
 	s.background.Wait()
 }
 

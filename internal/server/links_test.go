@@ -1,0 +1,125 @@
+package server
+
+import (
+	"archive/zip"
+	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"3d-vault/internal/vault"
+)
+
+func (e *env) addFile(projectID int64, path string, data []byte) vault.CommitResult {
+	e.t.Helper()
+	m := e.uploadChunks(e.juanToken, data)
+	resp := e.do(apiCall{method: http.MethodPost, path: "/api/assets", token: e.juanToken, clientID: "pc-1", body: map[string]any{
+		"project_id": projectID, "path": path, "manifest": m, "comment": "Primera versión",
+	}})
+	wantStatus(e.t, resp, http.StatusCreated)
+	return decode[vault.CommitResult](e.t, resp)
+}
+
+// waitLinks espera a que termine el análisis en segundo plano de un .blend.
+func (e *env) waitLinks(assetID int64) vault.AssetLinks {
+	e.t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		links, err := e.svc.AssetLinks(e.ctx, assetID)
+		if err != nil {
+			e.t.Fatal(err)
+		}
+		if !links.Pending {
+			return links
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatal("el análisis de enlaces no terminó")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func blendFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "blendrefs", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestWebLinks(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	project := e.newProject()
+	scene := e.addFile(project.ID, "escenas/escena_01.blend", blendFixture(t, "escena_01.blend"))
+	e.waitLinks(scene.Asset.ID)
+
+	b := e.newBrowser()
+	b.login("ana")
+	sceneURL := "/assets/" + strconv.FormatInt(scene.Asset.ID, 10)
+	resp, body := b.get(sceneURL)
+	wantPage(t, resp, body, http.StatusOK, "Archivos enlazados", "3 archivos enlazados no se verán", "Falta subirlo", "Fuera de 3D-Vault", "maestros/camion_maestro.blend")
+
+	base := "/projects/" + strconv.FormatInt(project.ID, 10)
+	resp, body = b.get(base)
+	wantPage(t, resp, body, http.StatusOK, "3 enlaces rotos", "Con enlaces rotos", "Agregar aquí", "webkitdirectory")
+
+	master := e.addFile(project.ID, "maestros/camion_maestro.blend", blendFixture(t, "camion_maestro.blend"))
+	e.addFile(project.ID, "texturas/madera.png", randomBytes(t, 200))
+	e.waitLinks(master.Asset.ID)
+
+	resp, body = b.get(sceneURL)
+	wantPage(t, resp, body, http.StatusOK, "1 archivo enlazado no se verá", "En 3D-Vault · v1", "with-links.zip")
+	resp, body = b.get("/assets/" + strconv.FormatInt(master.Asset.ID, 10))
+	wantPage(t, resp, body, http.StatusOK, "Lo usan", "escenas/escena_01.blend")
+	resp, body = b.get(base)
+	wantPage(t, resp, body, http.StatusOK, "1 enlace roto", "Lo usan 1")
+	resp, body = b.get(base + "?estado=enlaces-rotos")
+	wantPage(t, resp, body, http.StatusOK, "1 enlace roto")
+	if strings.Contains(body, `href="/assets/`+strconv.FormatInt(master.Asset.ID, 10)+`"`) {
+		t.Error("la pestaña de enlaces rotos muestra el maestro, que no tiene ninguno")
+	}
+
+	resp, body = b.get(sceneURL + "/with-links.zip")
+	wantPage(t, resp, body, http.StatusOK)
+	zr, err := zip.NewReader(strings.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatalf("no es un zip: %v", err)
+	}
+	var names []string
+	for _, f := range zr.File {
+		names = append(names, f.Name)
+	}
+	slices.Sort(names)
+	want := []string{"Mina Norte/escenas/escena_01.blend", "Mina Norte/maestros/camion_maestro.blend", "Mina Norte/texturas/madera.png"}
+	if !slices.Equal(names, want) {
+		t.Errorf("zip = %v, want %v", names, want)
+	}
+
+	resp = e.do(apiCall{method: http.MethodGet, path: "/api/assets/" + strconv.FormatInt(master.Asset.ID, 10) + "/links", token: e.anaToken})
+	wantStatus(t, resp, http.StatusOK)
+	links := decode[vault.AssetLinks](t, resp)
+	if len(links.UsedBy) != 1 || links.UsedBy[0].Asset.ID != scene.Asset.ID || len(links.Uses) != 1 || links.Uses[0].Status != vault.LinkOK {
+		t.Errorf("links del maestro = %+v", links)
+	}
+}
+
+func TestWebGuide(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	b := e.newBrowser()
+	b.login("ana")
+	resp, body := b.get("/guia")
+	wantPage(t, resp, body, http.StatusOK, "Qué es un archivo maestro", "Enlazar desde 3D-Vault…", `href="/guia"`, `aria-selected="true">Archivos enlazados`)
+	resp, body = b.get("/guia?tema=carpetas")
+	wantPage(t, resp, body, http.StatusOK, "Subir una carpeta entera", `aria-selected="true">Subir carpetas`)
+	resp, body = b.get("/guia?tema=problemas")
+	wantPage(t, resp, body, http.StatusOK, "Texturas rosas")
+	resp, body = b.get("/guia?tema=otro")
+	wantPage(t, resp, body, http.StatusOK, "Qué es un archivo maestro")
+}

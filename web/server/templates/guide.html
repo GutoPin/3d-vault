@@ -1,0 +1,173 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <h1>Guía</h1>
+    <p class="sub">Cómo trabajar con archivos maestros, escenas y carpetas en 3D-Vault.</p>
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Temas de la guía">
+  {{range .Data.Tabs}}<a href="{{.Href}}"{{if .Selected}} aria-selected="true"{{end}}>{{.Label}}</a>{{end}}
+</nav>
+
+{{if eq .Data.Topic "enlaces"}}
+<article class="guide">
+  <section class="guide-intro">
+    <div>
+      <h2>Qué es un archivo maestro</h2>
+      <p>Un <strong>maestro</strong> es un <code>.blend</code> con objetos que se usan en muchas escenas: el camión, la grúa, el terreno. Las escenas no los copian: los <strong>enlazan</strong>. Cuando alguien mejora el maestro, todas las escenas que lo usan ven el cambio.</p>
+      <p>Para que eso funcione en todas las PCs, la escena tiene que encontrar el maestro en el mismo lugar, <strong>dentro de la carpeta del proyecto</strong>. Esta guía explica cómo.</p>
+    </div>
+    <figure class="guide-figure" aria-label="Un maestro enlazado por dos escenas">
+      <svg viewBox="0 0 360 170" role="img">
+        <title>camion.blend enlazado por escena_01 y escena_02</title>
+        <defs><marker id="flecha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="g-arrow-head"/></marker></defs>
+        <rect class="g-box g-master" x="10" y="55" width="130" height="60" rx="8"/>
+        <text class="g-title" x="75" y="81" text-anchor="middle">camion.blend</text>
+        <text class="g-note" x="75" y="100" text-anchor="middle">maestro</text>
+        <rect class="g-box" x="220" y="15" width="130" height="50" rx="8"/>
+        <text class="g-title" x="285" y="45" text-anchor="middle">escena_01.blend</text>
+        <rect class="g-box" x="220" y="105" width="130" height="50" rx="8"/>
+        <text class="g-title" x="285" y="135" text-anchor="middle">escena_02.blend</text>
+        <path class="g-arrow" d="M218 40 C180 40 175 70 142 78" marker-end="url(#flecha)"/>
+        <path class="g-arrow" d="M218 130 C180 130 175 100 142 92" marker-end="url(#flecha)"/>
+        <text class="g-note" x="180" y="88" text-anchor="middle">enlazan</text>
+      </svg>
+      <figcaption>Las escenas apuntan al maestro. Lo editas una vez y lo ven todas.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>1. Ordena las carpetas del proyecto</h2>
+    <p>Todo lo que una escena usa tiene que estar en la carpeta del proyecto, dentro de tu carpeta de 3D-Vault. Por ejemplo:</p>
+    <pre class="guide-tree">3D-Vault/
+└── Camiones/              ← la carpeta del proyecto
+    ├── maestros/
+    │   ├── camion.blend
+    │   └── grua.blend
+    ├── texturas/
+    │   └── chapa.png
+    └── escenas/
+        ├── escena_01.blend
+        └── escena_02.blend</pre>
+    <p class="guide-tip"><strong>Maestros compartidos entre proyectos:</strong> crea un proyecto aparte, por ejemplo «Biblioteca», y márcalo en Mi carpeta junto al proyecto donde lo usas. El enlace funciona porque los dos quedan dentro de la misma carpeta <code>3D-Vault</code>.</p>
+  </section>
+
+  <section>
+    <h2>2. Sube el maestro</h2>
+    <ol class="guide-steps">
+      <li>Abre el maestro en Blender. Debe estar guardado en <code>maestros/</code> del proyecto.</li>
+      <li>En la vista 3D pulsa <kbd>N</kbd> y abre la pestaña <strong>3D-Vault</strong>.</li>
+      <li>Pulsa <span class="btn-like">Agregar a 3D-Vault</span>. Desde ese momento lo tienen todos.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>3. Enlaza objetos del maestro en tu escena</h2>
+    <ol class="guide-steps">
+      <li>Abre tu escena, guardada dentro del proyecto (por ejemplo en <code>escenas/</code>).</li>
+      <li>En el panel <strong>3D-Vault</strong>, despliega <strong>Archivos enlazados</strong> y pulsa <span class="btn-like">Enlazar desde 3D-Vault…</span>. Se abre <em>Archivo → Enlazar</em> en la carpeta del proyecto, ya con ruta relativa.</li>
+      <li>Entra a <code>maestros/camion.blend</code>, luego a <code>Collection</code> (o <code>Object</code>), elige lo que quieras y pulsa <strong>Enlazar</strong>.</li>
+      <li>Guarda la escena y súbela con <span class="btn-like">Guardar y subir</span>, como siempre.</li>
+    </ol>
+    <p class="guide-tip"><strong>No uses <em>Anexar</em> (Append) para los maestros:</strong> copia los objetos dentro de tu escena y ya no recibe los cambios del maestro. Úsalo solo si quieres una copia independiente.</p>
+  </section>
+
+  <section>
+    <h2>4. Lee el panel «Archivos enlazados»</h2>
+    <p>En Blender, cada maestro que usa tu escena aparece con su estado y lo que puedes hacer:</p>
+    <div class="guide-split">
+      <div class="guide-panel" aria-label="Ejemplo del panel de Blender">
+        <div class="gp-head">3D-Vault › Archivos enlazados</div>
+        <div class="gp-item"><div class="gp-name">camion.blend</div><div class="gp-line ok">Al día · v4</div><div class="gp-buttons"><span>Recargar</span><span>Abrir para editar</span></div></div>
+        <div class="gp-item"><div class="gp-name">grua.blend</div><div class="gp-line warn">Tienes la v2 · hay v3 de Ana</div><div class="gp-buttons"><span>Actualizar y recargar</span><span>Abrir para editar</span></div></div>
+        <div class="gp-item"><div class="gp-name">cabina.blend</div><div class="gp-line bad">Falta subirlo: en otras PCs no se verá</div><div class="gp-buttons"><span>Subir a 3D-Vault</span></div></div>
+        <div class="gp-foot"><span>Enlazar desde 3D-Vault…</span></div>
+      </div>
+      <div class="panel table-panel">
+        <table class="stack-table guide-table">
+          <thead><tr><th>Si ves…</th><th>Haz esto</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill pos">Al día · v4</span></td><td>Nada: tienes la última versión del maestro.</td></tr>
+            <tr><td><span class="pill warn">Tienes la v3 · hay v4 de Ana</span></td><td><strong>Actualizar y recargar</strong>: baja el maestro nuevo y lo muestra sin cerrar tu escena.</td></tr>
+            <tr><td><span class="pill">Cambió en el disco</span></td><td>Mi carpeta ya bajó el maestro nuevo. Pulsa <strong>Recargar para ver los cambios</strong>.</td></tr>
+            <tr><td><span class="pill neg">Falta subirlo</span></td><td>El maestro está en tu PC pero no en 3D-Vault. Pulsa <strong>Subir a 3D-Vault</strong>.</td></tr>
+            <tr><td><span class="pill neg">Ruta absoluta</span></td><td>Solo funciona en tu PC. Pulsa <strong>Arreglar rutas</strong> en el panel principal y vuelve a subir la escena.</td></tr>
+            <tr><td><span class="pill neg">Fuera de la carpeta de 3D-Vault</span></td><td>El maestro está en Descargas, el Escritorio u otro sitio. Muévelo a <code>maestros/</code> del proyecto, súbelo y vuelve a enlazarlo.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. Edita un maestro</h2>
+    <ol class="guide-steps">
+      <li>En <strong>Archivos enlazados</strong>, pulsa <span class="btn-like">Abrir para editar</span> junto al maestro. Tu escena se guarda y se abre el maestro.</li>
+      <li>Pulsa <span class="btn-like">Bloquear</span>. Así nadie más lo cambia a la vez.</li>
+      <li>Haz tus cambios y pulsa <span class="btn-like">Guardar y subir</span>, con un comentario como «Ruedas más detalladas». Al subir se libera el bloqueo.</li>
+      <li>El panel muestra <strong>Lo usan</strong>: son las escenas que verán tu cambio cuando las abran o pulsen <strong>Recargar</strong>.</li>
+    </ol>
+    <p class="guide-tip"><strong>Cuidado al renombrar o mover un maestro:</strong> las escenas lo buscan por su ruta. Si lo mueves, vuelve a enlazarlo en cada escena de la lista <strong>Lo usan</strong>.</p>
+  </section>
+
+  <section>
+    <h2>6. Revisa en la web</h2>
+    <ul class="guide-steps">
+      <li>En la lista del proyecto, un <code>.blend</code> con problemas lleva <span class="pill warn">1 enlace roto</span>, y la pestaña <strong>Con enlaces rotos</strong> los reúne. Un maestro lleva <span class="pill">Lo usan 3</span>.</li>
+      <li>En la ficha de un <code>.blend</code>, <strong>Archivos enlazados</strong> muestra cada maestro, textura o sonido que usa y si está en 3D-Vault.</li>
+      <li><strong>Descargar con todo lo que usa (.zip)</strong> baja la escena con sus maestros y texturas en sus carpetas: al descomprimirlo, se abre completa en cualquier PC.</li>
+    </ul>
+  </section>
+</article>
+
+{{else if eq .Data.Topic "carpetas"}}
+<article class="guide">
+  <section>
+    <h2>Subir una carpeta entera desde la web</h2>
+    <p>Sirve para traer de una vez un trabajo que ya tienes ordenado: escenas, maestros y texturas, con sus subcarpetas. Las subcarpetas se conservan, así que los enlaces y las texturas con ruta relativa siguen funcionando.</p>
+    <ol class="guide-steps">
+      <li>Abre el proyecto en el menú de la izquierda.</li>
+      <li>Abajo, en <strong>Agregar archivos o carpetas</strong>, pulsa <span class="btn-like">Elegir una carpeta</span>. También puedes arrastrar la carpeta desde el Explorador de Windows y soltarla sobre la página.</li>
+      <li>Deja <strong>Carpeta dentro del proyecto</strong> vacía para ponerla en la raíz del proyecto, o escribe dónde va. Cada carpeta de la lista tiene <strong>Agregar aquí</strong>, que la rellena por ti.</li>
+      <li>Pulsa <span class="btn-like">Agregar</span>. Verás un resumen antes de subir nada:
+        <ul>
+          <li><strong>Archivos nuevos</strong>: se agregan.</li>
+          <li><strong>Archivos que ya existen</strong>: reciben una versión nueva solo si cambiaron.</li>
+          <li><strong>Bloqueados por otra persona</strong>: no se tocan.</li>
+          <li><strong>Temporales</strong> de Blender o del sistema (<code>.blend1</code>, <code>Thumbs.db</code>…): se omiten.</li>
+        </ul>
+      </li>
+      <li>Pulsa <span class="btn-like">Subir</span>. Solo viaja lo que el servidor no tenga.</li>
+    </ol>
+    <p class="guide-tip"><strong>Respeta la estructura original.</strong> Si tus escenas están en <code>ESCENAS/</code> y enlazan maestros de <code>ASSETS/</code>, sube las dos carpetas a la raíz del mismo proyecto. Así quedan una al lado de la otra, como en tu PC.</p>
+  </section>
+
+  <section>
+    <h2>Con Mi carpeta</h2>
+    <p>Si usas <a href="/sync">Mi carpeta</a>, arrastra las carpetas sobre la tabla del proyecto: se copian a tu carpeta sincronizada y te pide un comentario para subirlas todas.</p>
+  </section>
+</article>
+
+{{else}}
+<article class="guide">
+  <section>
+    <h2>Si algo no se ve en otra PC</h2>
+    <div class="panel table-panel">
+      <table class="stack-table guide-table">
+        <thead><tr><th>Lo que pasa</th><th>Por qué</th><th>Cómo se arregla</th></tr></thead>
+        <tbody>
+          <tr><td>Un objeto enlazado no aparece, o Blender avisa de una biblioteca que falta</td><td>El maestro no está en 3D-Vault, o se enlazó desde fuera del proyecto</td><td>Quien tiene la escena abre <strong>Archivos enlazados</strong> y pulsa <strong>Subir a 3D-Vault</strong>. Si está fuera, lo mueve al proyecto y lo vuelve a enlazar</td></tr>
+          <tr><td>Texturas rosas</td><td>La imagen está fuera del proyecto o con ruta absoluta</td><td>Quien subió la escena pulsa <strong>Arreglar rutas</strong> y la vuelve a subir</td></tr>
+          <tr><td>Funciona en mi PC pero en la de mi compañero no</td><td>Ruta absoluta: apunta a <code>C:\Users\tu-usuario\…</code></td><td><strong>Arreglar rutas</strong> la cambia a relativa. Revisa la ficha en la web: no debe decir <span class="pill warn">Ruta absoluta</span></td></tr>
+          <tr><td>No veo el cambio que hizo mi compañero en el maestro</td><td>Blender carga los maestros al abrir la escena</td><td>Pulsa <strong>Actualizar y recargar</strong> o <strong>Recargar</strong> en Archivos enlazados</td></tr>
+          <tr><td>El enlace a otro proyecto no funciona</td><td>Ese proyecto no está marcado en tu Mi carpeta</td><td>Márcalo en <a href="/sync">Mi carpeta</a> para que se descargue</td></tr>
+          <tr><td>El panel no muestra «Archivos enlazados»</td><td>El complemento de Blender es anterior a la versión 1.2</td><td>Pulsa <strong>Descargar la versión nueva</strong> en el panel, o bájalo en Mi carpeta → Comodidades → Conectar Blender, e instálalo igual que la primera vez</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="guide-tip">Para encontrar todos los problemas de un proyecto, abre el proyecto y la pestaña <strong>Con enlaces rotos</strong>.</p>
+  </section>
+</article>
+{{end}}
+{{end}}

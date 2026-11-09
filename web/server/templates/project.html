@@ -33,10 +33,10 @@
           <tbody>
           {{range .Data.Rows}}
             {{if .Folder}}
-            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> <a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a></span></td></tr>
+            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> <a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a> <button class="text-action folder-zip" type="button" data-upload-here="{{.Prefix}}" aria-label="Agregar archivos a la carpeta {{.Name}}">Agregar aquí</button></span></td></tr>
             {{else}}
             <tr>
-              <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a></span></td>
+              <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a>{{with .Links}}{{if .Broken}}<span class="pill warn link-mark" title="Usa archivos que en otras PCs no se encontrarán">{{plural .Broken "enlace roto" "enlaces rotos"}}</span>{{end}}{{if .UsedBy}}<span class="pill link-mark" title="Otros .blend enlazan este archivo">Lo usan {{.UsedBy}}</span>{{end}}{{end}}</span></td>
               <td class="n" data-label="Versión:">v{{.Asset.HeadVersion}}</td>
               <td class="n" data-label="Tamaño:">{{formatBytes .Asset.SizeBytes}}</td>
               <td>{{template "lock-mark" .Asset.Lock}}</td>
@@ -54,14 +54,23 @@
   </div>
 </div>
 
-<section class="settings-row">
+<section class="settings-row" id="agregar">
   <div>
-    <h2>Agregar archivos</h2>
-    <p>Desde cualquier navegador, sin carpeta conectada. En Mi carpeta también puedes arrastrarlos sobre el proyecto.</p>
+    <h2>Agregar archivos o carpetas</h2>
+    <p>Desde cualquier navegador, sin carpeta conectada. Una carpeta se sube con todo lo que tiene dentro, con sus subcarpetas: la escena, sus texturas y sus archivos enlazados. También puedes arrastrarlos sobre esta página. <a href="/guia?tema=carpetas">Ver la guía</a>.</p>
   </div>
-  <form class="panel form-grid" id="web-upload" data-project="{{.Data.Project.ID}}">
-    <div class="field wide"><label for="file">Archivos</label><input class="input file-input" id="file" name="file" type="file" multiple required></div>
-    <div class="field"><label for="folder">Carpeta dentro del proyecto</label><input class="input" id="folder" name="folder" placeholder="Por ejemplo modelos/camiones" maxlength="500"><span class="hint">Vacío: en la raíz del proyecto.</span></div>
+  <form class="panel form-grid drop-target" id="web-upload" data-project="{{.Data.Project.ID}}">
+    <div class="field wide">
+      <span class="label-like">Qué subir</span>
+      <div class="pick-row">
+        <label class="btn" for="file">Elegir archivos</label>
+        <label class="btn" for="dir">Elegir una carpeta</label>
+        <span class="sub" data-picked>Nada elegido. También puedes arrastrar archivos o carpetas aquí.</span>
+      </div>
+      <input class="visually-hidden" id="file" name="file" type="file" multiple>
+      <input class="visually-hidden" id="dir" name="dir" type="file" webkitdirectory multiple>
+    </div>
+    <div class="field"><label for="folder">Carpeta dentro del proyecto</label><input class="input" id="folder" name="folder" placeholder="Por ejemplo modelos/camiones" maxlength="500"><span class="hint">Vacío: en la raíz del proyecto. Si eliges una carpeta, se crea dentro de esta.</span></div>
     <div class="field"><label for="comment">Comentario</label><input class="input" id="comment" name="comment" value="Primera versión" minlength="3" maxlength="500" required></div>
     <div class="wide form-foot upload-foot"><span class="sub" data-status role="status"></span><button class="btn primary" type="submit">Agregar</button></div>
   </form>

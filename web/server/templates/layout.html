@@ -27,6 +27,7 @@
     <form class="side-search" method="get" action="/search" role="search"><input class="input" type="search" name="q" placeholder="Buscar archivos" aria-label="Buscar archivos en todos los proyectos"></form>
     <a class="nav-item" href="/sync"{{if eq .Active "sync"}} aria-current="page"{{end}}>Mi carpeta</a>
     <a class="nav-item" href="/activity"{{if eq .Active "activity"}} aria-current="page"{{end}}>Actividad</a>
+    <a class="nav-item" href="/guia"{{if eq .Active "guide"}} aria-current="page"{{end}}>Guía</a>
     <div class="group-label">Proyectos</div>
     <a class="nav-item" href="/"{{if eq .Active "projects"}} aria-current="page"{{end}}>Todos los proyectos</a>
     {{range .Projects}}<a class="nav-item" href="/projects/{{.ID}}"{{if eq $.ActiveProject .ID}} aria-current="page"{{end}}><span class="nav-name">{{.Name}}</span></a>

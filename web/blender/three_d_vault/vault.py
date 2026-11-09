@@ -291,6 +291,36 @@ def locate(filepath, projects):
     return None, None
 
 
+def project_root_of(filepath, asset_path):
+    """La carpeta del proyecto en esta PC: la ruta del archivo sin su ruta en el proyecto."""
+    full = os.path.normpath(os.path.abspath(filepath))
+    rel = os.path.normpath(asset_path.replace("/", os.sep))
+    return full[: len(full) - len(rel)].rstrip(os.sep)
+
+
+def inside(path, folder):
+    """Si path está dentro de folder, sin distinguir mayúsculas en Windows."""
+    path = os.path.normcase(os.path.normpath(os.path.abspath(path)))
+    folder = os.path.normcase(os.path.normpath(os.path.abspath(folder)))
+    return path.startswith(folder.rstrip(os.sep) + os.sep)
+
+
+def link_problem(raw, absolute, sync_root):
+    """Por qué un archivo enlazado no se verá en otra PC, o None si está bien.
+
+    raw es la ruta tal como la guarda Blender ("//" si es relativa) y absolute,
+    la misma ya resuelta. sync_root es la carpeta de 3D-Vault de esta PC, que
+    contiene una carpeta por proyecto: un enlace a otro proyecto también vale.
+    """
+    if not inside(absolute, sync_root):
+        return "outside"
+    if not os.path.isfile(absolute):
+        return "missing"
+    if not raw.startswith("//"):
+        return "absolute"
+    return None
+
+
 def conflict_name(path, username):
     folder, name = os.path.split(path)
     stem, ext = os.path.splitext(name)
@@ -355,6 +385,29 @@ class Vault:
         else:
             st["state"] = "modified"
         return st
+
+    def links(self, asset_id):
+        """Lo que usa un archivo y quién lo usa, según el servidor."""
+        return self.api.request("GET", f"/api/assets/{asset_id}/links")
+
+    def libraries(self, st, filepath, libs):
+        """Estado de los .blend enlazados por el archivo abierto.
+
+        libs es una lista de (nombre, ruta como la guarda Blender, ruta absoluta).
+        Cada resultado lleva "problem" (ver link_problem) y, si el archivo está
+        en una carpeta de 3D-Vault, "status" con su estado frente al servidor.
+        """
+        sync_root = os.path.dirname(project_root_of(filepath, st["path"]))
+        out = []
+        for name, raw, absolute in libs:
+            item = {"name": name, "raw": raw, "path": absolute, "problem": link_problem(raw, absolute, sync_root), "status": None, "error": None}
+            if item["problem"] in (None, "absolute"):
+                try:
+                    item["status"] = self.status(absolute)
+                except VaultError as err:
+                    item["error"] = str(err)
+            out.append(item)
+        return out
 
     def addon_update(self):
         """La versión del complemento que entrega el servidor, si es otra."""

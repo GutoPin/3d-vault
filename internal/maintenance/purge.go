@@ -65,6 +65,9 @@ func Purge(ctx context.Context, database *db.DB, keepLast int, cutoff time.Time,
 			// restored_from de las versiones que quedan pasa a NULL por la clave foránea.
 			`DELETE FROM versions WHERE id IN (SELECT id FROM purge_versions)`,
 			`DELETE FROM manifest_chunks WHERE manifest_id NOT IN (SELECT manifest_id FROM versions)`,
+			// Los enlaces leídos de un contenido que ya no tiene ninguna versión.
+			`DELETE FROM blend_refs WHERE file_sha256 NOT IN (SELECT file_sha256 FROM versions)`,
+			`DELETE FROM blend_scans WHERE file_sha256 NOT IN (SELECT file_sha256 FROM versions)`,
 		} {
 			if _, err := tx.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("purgar versiones: %w", err)

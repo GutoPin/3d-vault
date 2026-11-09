@@ -31,6 +31,7 @@ const (
 
 	stateLocked = "bloqueados"
 	stateMine   = "mios"
+	stateBroken = "enlaces-rotos"
 )
 
 type pageSet struct {
@@ -42,9 +43,11 @@ func loadPages() (*pageSet, error) {
 		"formatBytes":   formatBytes,
 		"formatPercent": formatPercent,
 		"when":          func(t time.Time) string { return formatWhen(t, time.Now()) },
+		"linkKind":      linkKind,
+		"plural":        plural,
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -197,12 +200,14 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Post("/account/password", s.webChangePassword)
 		r.Post("/account/tokens/{id}/revoke", s.webRevokeToken)
 		r.Get("/activity", s.webActivity)
+		r.Get("/guia", s.webGuide)
 		r.Get("/search", s.webSearch)
 		r.Get("/blender/3dvault.zip", s.blenderAddon)
 		r.Get("/blender/version", s.blenderVersion)
 		r.Post("/projects", s.webCreateProject)
 		r.Get("/projects/{id}", s.webProject)
 		r.Get("/projects/{id}/download.zip", s.webProjectZip)
+		r.Get("/assets/{id}/with-links.zip", s.webLinkedZip)
 		r.Get("/assets/{id}", s.webAsset)
 		r.Post("/assets/{id}/lock", s.webLock)
 		r.Post("/assets/{id}/unlock", s.webUnlock)
@@ -384,6 +389,8 @@ type treeRow struct {
 	Asset  vault.Asset
 	// Prefix es la ruta de una carpeta, para descargarla.
 	Prefix string
+	// Links resume los enlaces del archivo: lo que usa y quién lo usa.
+	Links vault.LinkSummary
 }
 
 type projectData struct {
@@ -416,13 +423,18 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	state := r.URL.Query().Get("estado")
-	if state != stateLocked && state != stateMine {
+	if state != stateLocked && state != stateMine && state != stateBroken {
 		state = ""
+	}
+	links, err := s.svc.ProjectLinks(r.Context(), id)
+	if err != nil {
+		s.webFail(w, r, err)
+		return
 	}
 	user, _ := currentUser(r)
 
 	// Los contadores siguen a la búsqueda: dicen cuántos verás al cambiar de pestaña.
-	var matching, locked, mine []vault.Asset
+	var matching, locked, mine, broken []vault.Asset
 	var totalBytes int64
 	totalLocked := 0
 	needle := strings.ToLower(query)
@@ -435,6 +447,9 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		matching = append(matching, asset)
+		if links[asset.ID].Broken > 0 {
+			broken = append(broken, asset)
+		}
 		if asset.Lock != nil {
 			locked = append(locked, asset)
 			if asset.Lock.UserID == user.ID {
@@ -449,6 +464,8 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 		shown = locked
 	case stateMine:
 		shown = mine
+	case stateBroken:
+		shown = broken
 	}
 
 	tabHref := func(tabState string) string {
@@ -477,7 +494,11 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 		},
 		State: state,
 		Query: query,
-		Rows:  buildTree(shown),
+		Rows:  buildTree(shown, links),
+	}
+	// La pestaña de enlaces rotos solo aparece si hay alguno, o si está elegida.
+	if len(broken) > 0 || state == stateBroken {
+		data.Tabs = append(data.Tabs, tabData{Label: "Con enlaces rotos", Href: tabHref(stateBroken), Count: len(broken), Selected: state == stateBroken})
 	}
 	data.HasFiles = len(snap.Assets) > 0
 	switch {
@@ -487,6 +508,8 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 		data.EmptyMessage = "Ningún archivo coincide con esa búsqueda."
 	case state == stateMine:
 		data.EmptyMessage = "No tienes archivos bloqueados en este proyecto."
+	case state == stateBroken:
+		data.EmptyMessage = "Ningún .blend tiene enlaces rotos: todos los archivos que usan están en 3D-Vault."
 	default:
 		data.EmptyMessage = "No hay archivos bloqueados en este proyecto."
 	}
@@ -506,7 +529,7 @@ func lockSentence(locked int) string {
 
 // buildTree convierte rutas ordenadas en filas con sus carpetas. Una carpeta solo
 // aparece cuando cambia respecto al archivo anterior.
-func buildTree(assets []vault.Asset) []treeRow {
+func buildTree(assets []vault.Asset, links map[int64]vault.LinkSummary) []treeRow {
 	rows := make([]treeRow, 0, len(assets))
 	var current []string
 	for _, asset := range assets {
@@ -521,7 +544,7 @@ func buildTree(assets []vault.Asset) []treeRow {
 			rows = append(rows, treeRow{Folder: true, Name: dirs[i], Depth: min(i, maxTreeDepth), Prefix: strings.Join(dirs[:i+1], "/") + "/"})
 		}
 		current = dirs
-		rows = append(rows, treeRow{Name: name, Depth: min(len(dirs), maxTreeDepth), Asset: asset})
+		rows = append(rows, treeRow{Name: name, Depth: min(len(dirs), maxTreeDepth), Asset: asset, Links: links[asset.ID]})
 	}
 	return rows
 }
@@ -539,6 +562,8 @@ type assetData struct {
 	Thumbs map[int64]string
 	// Requested confirma que se pidió liberar el archivo.
 	Requested bool
+	// Links son los archivos que usa este .blend y los .blend que usan este archivo.
+	Links vault.AssetLinks
 }
 
 func (s *Server) webAsset(w http.ResponseWriter, r *http.Request) {
@@ -567,8 +592,15 @@ func (s *Server) renderAsset(w http.ResponseWriter, r *http.Request, status int,
 		return
 	}
 
+	links, err := s.svc.AssetLinks(r.Context(), id)
+	if err != nil {
+		s.webFail(w, r, err)
+		return
+	}
+
 	user, _ := currentUser(r)
 	data := assetData{
+		Links:       links,
 		Requested:   r.URL.Query().Get("pedido") == "1",
 		Project:     project,
 		Asset:       asset,

@@ -58,6 +58,66 @@
 </div>
 {{end}}
 
+{{with .Data.Links}}
+{{if or .Uses .UsedBy .Pending .Error}}
+<div class="ledger-head">
+  <h2>Archivos enlazados</h2>
+  {{if .Uses}}<p>{{plural (len .Uses) "archivo externo" "archivos externos"}} en la última versión.</p>{{end}}
+</div>
+{{if .Pending}}<p class="notice warn" role="status">Revisando qué archivos usa este .blend. Vuelve a cargar la página en un momento.</p>{{end}}
+{{if .Error}}<p class="notice warn">No se pudo leer qué archivos usa este .blend, así que no se muestran sus enlaces.</p>{{end}}
+{{with .Broken}}<p class="notice warn">{{if eq . 1}}1 archivo enlazado no se verá{{else}}{{.}} archivos enlazados no se verán{{end}} en otras PCs. Quien tenga este .blend puede arreglarlo con <strong>Arreglar rutas</strong> en el panel de 3D-Vault en Blender, o subiendo lo que falta. <a href="/guia?tema=problemas">Ver cómo</a>.</p>{{end}}
+{{if .Uses}}
+<div class="panel table-panel">
+  <div class="table-wrap">
+    <table class="stack-table links-table">
+      <thead><tr><th>Usa</th><th>Tipo</th><th>Estado</th></tr></thead>
+      <tbody>
+      {{range .Uses}}
+        <tr>
+          <td>{{if .Target}}<a class="name path" href="/assets/{{.Target.ID}}">{{if .Pattern}}{{.Path}}{{else}}{{.Target.Path}}{{end}}</a>{{if ne .Target.ProjectID $asset.ProjectID}}<div class="sub">En el proyecto {{.Project.Name}}</div>{{end}}
+              {{else}}<span class="path">{{if .Path}}{{.Path}}{{else}}{{.Raw}}{{end}}</span>{{end}}</td>
+          <td data-label="Tipo:">{{linkKind .Kind}}{{if .Pattern}} <span class="sub">({{if .Matches}}{{.Matches}} archivos{{else}}secuencia{{end}})</span>{{end}}</td>
+          <td>
+            {{if eq .Status "ok"}}<span class="pill pos">En 3D-Vault{{if not .Pattern}} · v{{.Target.HeadVersion}}{{end}}</span>
+            {{else if eq .Status "missing"}}<span class="pill neg">Falta subirlo</span><div class="sub">Está en la PC de quien guardó este .blend, pero no en 3D-Vault.</div>
+            {{else if eq .Status "absolute"}}<span class="pill warn">Ruta absoluta</span><div class="sub">Solo funciona en la PC donde se guardó: <span class="path">{{.Raw}}</span></div>
+            {{else}}<span class="pill neg">Fuera de 3D-Vault</span><div class="sub">Está fuera de las carpetas de los proyectos.</div>{{end}}
+          </td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="links-foot"><a class="btn" href="/assets/{{$asset.ID}}/with-links.zip" title="Con sus carpetas, para que las rutas relativas funcionen al descomprimirlo">Descargar con todo lo que usa (.zip)</a></p>
+{{end}}
+{{if .UsedBy}}
+<div class="ledger-head">
+  <h3>Lo usan</h3>
+  <p>{{plural (len .UsedBy) "archivo" "archivos"}}. Cuando subas una versión nueva, la verán al abrirlos o al pulsar <strong>Recargar</strong> en Blender.</p>
+</div>
+<div class="panel table-panel">
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Archivo</th><th class="n">Versión</th><th>Bloqueo</th><th class="n">Última subida</th></tr></thead>
+      <tbody>
+      {{range .UsedBy}}
+        <tr>
+          <td><a class="name path" href="/assets/{{.Asset.ID}}">{{.Asset.Path}}</a>{{if ne .Asset.ProjectID $asset.ProjectID}}<div class="sub">En el proyecto {{.Project.Name}}</div>{{end}}{{if eq .Status "absolute"}} <span class="pill warn">Con ruta absoluta</span>{{end}}</td>
+          <td class="n" data-label="Versión:">v{{.Asset.HeadVersion}}</td>
+          <td>{{if .Asset.Lock}}{{.Asset.Lock.DisplayName}}{{else}}<span class="free">Libre</span>{{end}}</td>
+          <td class="n">{{when .Asset.UpdatedAt}} <span class="sub">{{.Asset.UploadedBy}}</span></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+{{end}}
+{{end}}
+
 <div class="ledger-head">
   <h2>Historial</h2>
   <p>{{.Data.HistoryNote}}</p>

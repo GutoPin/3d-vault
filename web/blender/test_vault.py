@@ -93,6 +93,24 @@ class HelpersTest(unittest.TestCase):
         self.assertEqual((p["id"], path), (2, "b.blend"))
         self.assertEqual(vault.locate(os.path.join(root, "otro", "c.blend"), projects), (None, None))
 
+    def test_project_root_of(self):
+        root = os.path.join(tempfile.gettempdir(), "3D-Vault", "Camiones")
+        self.assertEqual(vault.project_root_of(os.path.join(root, "escenas", "a.blend"), "escenas/a.blend"), root)
+
+    def test_link_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sync = os.path.join(tmp, "3D-Vault")
+            master = os.path.join(sync, "Camiones", "maestros", "camion.blend")
+            other = os.path.join(sync, "Biblioteca", "roca.blend")
+            for p in (master, other):
+                os.makedirs(os.path.dirname(p))
+                open(p, "wb").close()
+            self.assertIsNone(vault.link_problem("//../maestros/camion.blend", master, sync))
+            self.assertIsNone(vault.link_problem("//../../Biblioteca/roca.blend", other, sync))
+            self.assertEqual(vault.link_problem(master, master, sync), "absolute")
+            self.assertEqual(vault.link_problem("//../maestros/grua.blend", os.path.join(sync, "Camiones", "maestros", "grua.blend"), sync), "missing")
+            self.assertEqual(vault.link_problem("//../../../fuera.blend", os.path.join(tmp, "fuera.blend"), sync), "outside")
+
 
 if __name__ == "__main__":
     unittest.main()

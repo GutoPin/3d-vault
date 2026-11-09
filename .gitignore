@@ -25,3 +25,9 @@
 
 # Python
 __pycache__/
+
+# Escenas pequeñas para las pruebas del lector de enlaces
+!/internal/blendrefs/testdata/*.blend
+
+# Ajustes de despliegue propios de cada servidor
+/deploy/docker-compose.override.yml

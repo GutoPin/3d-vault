@@ -78,13 +78,34 @@ Después, en la vista 3D pulsa **N** y abre la pestaña **3D-Vault**. Con un arc
 - **Pedir que lo libere**, si lo tiene otra persona.
 - **Versiones** (despliégalo): todas las versiones con su autor, fecha y comentario. El botón de ventana de cada una la **abre aparte**, en otra ventana de Blender, para compararla con la tuya sin tocar tu archivo.
 
-**Texturas:** si el archivo usa imágenes que están fuera de la carpeta del proyecto (por ejemplo en Descargas) o con ruta absoluta, en las PCs de tus compañeros se verían rosas. El panel lo avisa: pulsa **Arreglar texturas** y las copia a la carpeta `texturas` del proyecto, deja las rutas bien y las sube. Después sube el `.blend`.
+**Texturas:** si el archivo usa imágenes que están fuera de la carpeta del proyecto (por ejemplo en Descargas) o con ruta absoluta, en las PCs de tus compañeros se verían rosas. El panel lo avisa: pulsa **Arreglar rutas** y las copia a la carpeta `texturas` del proyecto, deja las rutas bien y las sube. Después sube el `.blend`.
 
 Con Blender abierto, cada minuto revisa si alguien subió una versión nueva del archivo que tienes abierto y te avisa, aunque no tengas Mi carpeta abierta.
 
 Si el complemento se queda viejo, el panel lo avisa con un botón para bajar el nuevo: instálalo igual que la primera vez.
 
 Además te avisa **al abrir** un archivo si hay una versión más nueva o si lo tiene otra persona, y **al guardar** si lo estás editando sin bloquearlo.
+
+## Archivos maestros y enlazados
+
+Un **archivo maestro** guarda objetos que se reutilizan en muchas escenas: el camión, la grúa, la cabina. Las escenas no los copian: los **enlazan** (en Blender, **Archivo → Enlazar**). Así, cuando alguien mejora el maestro, todas las escenas que lo usan ven el cambio.
+
+Para que funcione en todas las PCs:
+
+1. **Guarda el maestro dentro de un proyecto** de 3D-Vault, por ejemplo en `maestros/camion.blend`, y súbelo. Si lo comparten varios proyectos, puede vivir en un proyecto propio, como «Biblioteca»: el enlace entre proyectos funciona si tienes los dos marcados en Mi carpeta.
+2. **Enlaza desde el panel:** en **Archivos enlazados**, **Enlazar desde 3D-Vault…** abre **Archivo → Enlazar** en la carpeta del proyecto, con ruta relativa. Entra al `.blend`, luego a `Collection` u `Object`, y elige lo que quieras.
+3. **Sube la escena** como siempre.
+
+En el panel de 3D-Vault (tecla **N**), **Archivos enlazados** muestra cada maestro que usa la escena:
+
+- **Al día · v4**, o **Tienes la v3 · hay v4 de Ana**: pulsa **Actualizar y recargar** y verás el cambio sin cerrar tu escena.
+- **Cambió en el disco:** Mi carpeta bajó una versión nueva. Pulsa **Recargar para ver los cambios**.
+- **Falta subirlo:** el maestro está en tu PC pero no en 3D-Vault. Pulsa **Subir a 3D-Vault**, o tus compañeros no lo verán.
+- **Ruta absoluta** o **Fuera de la carpeta de 3D-Vault:** el enlace solo funciona en tu PC. **Arreglar rutas** corrige las rutas absolutas. Si el maestro está fuera de 3D-Vault, cópialo a un proyecto y vuelve a enlazarlo.
+
+**Para editar un maestro**, pulsa **Abrir para editar**: guarda tu escena y abre el maestro. Bloquéalo, cambia lo que necesites, guarda y súbelo como cualquier archivo. En el maestro, el panel muestra **Lo usan** con las escenas que lo enlazan: son las que verán tu cambio.
+
+En la web, la ficha de un `.blend` tiene **Archivos enlazados**: lo que usa (maestros, texturas, sonidos, cachés…) y si cada uno está en 3D-Vault, y en un maestro, **Lo usan**. **Descargar con todo lo que usa (.zip)** baja la escena con sus maestros y texturas en sus carpetas, lista para abrir. En la lista del proyecto, los `.blend` con enlaces rotos llevan un aviso y tienen su propia pestaña, **Con enlaces rotos**.
 
 ## Guarda sin comprimir
 
@@ -96,7 +117,11 @@ La forma más rápida: **arrastra los archivos o carpetas** desde el Explorador 
 
 También puedes copiar o guardar el archivo dentro de la carpeta del proyecto. En Mi carpeta aparece como **Nuevo, sin subir**. Pulsa **Agregar…**, escribe un comentario y listo: desde ese momento lo tienen todos.
 
-¿Estás en otra PC o sin Mi carpeta? En la página del proyecto, **Agregar archivos** sube desde cualquier navegador, y en la ficha de un archivo, **Subir nueva versión**.
+¿Estás en otra PC o sin Mi carpeta? En la página del proyecto, **Agregar archivos o carpetas** sube desde cualquier navegador, y en la ficha de un archivo, **Subir nueva versión**:
+
+- **Elegir una carpeta** sube la carpeta entera con sus subcarpetas: por ejemplo una escena con su carpeta `texturas` y sus maestros. También puedes arrastrar archivos o carpetas sobre la página.
+- Cada carpeta de la lista tiene **Agregar aquí**, para subir dentro de ella.
+- Antes de subir te muestra qué es nuevo, qué ya existía (recibe una versión nueva si cambió) y qué está bloqueado por otra persona (no se toca).
 
 Si tienes varios archivos nuevos o cambiados, el botón **Subir todo** junto al nombre del proyecto los sube de una vez con el mismo comentario.
 

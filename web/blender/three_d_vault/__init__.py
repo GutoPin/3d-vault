@@ -20,7 +20,9 @@ from bpy.props import BoolProperty, IntProperty, StringProperty
 
 from . import vault
 
-STATE = {"status": None, "path": None, "error": None, "busy": None, "progress": None, "notice": None}
+STATE = {"status": None, "path": None, "error": None, "busy": None, "progress": None, "notice": None,
+         # Fecha de cada .blend enlazado al abrirlo o recargarlo, para avisar si cambia.
+         "lib_mtimes": {}, "libs_changed": set()}
 _job = None
 _vault = {"code": None, "obj": None}
 
@@ -117,13 +119,67 @@ def progress(what, done, total=0):
 
 
 REMOTE_EVERY = 60  # segundos entre revisiones de versiones nuevas
+LIBRARY_EVERY = 5  # segundos entre miradas a los .blend enlazados en el disco
 
 
 def project_root(st):
     """La carpeta del proyecto en esta PC: la ruta del archivo sin su ruta en el proyecto."""
-    full = os.path.normpath(bpy.data.filepath)
-    rel = os.path.normpath(st["path"].replace("/", os.sep))
-    return full[: len(full) - len(rel)].rstrip(os.sep)
+    return vault.project_root_of(bpy.data.filepath, st["path"])
+
+
+def sync_root(st):
+    """La carpeta de 3D-Vault de esta PC: una carpeta por proyecto."""
+    return os.path.dirname(project_root(st))
+
+
+def library_list():
+    """Los .blend enlazados: (nombre, ruta como la guarda Blender, ruta absoluta)."""
+    return [(lib.name, lib.filepath, os.path.normpath(bpy.path.abspath(lib.filepath)))
+            for lib in bpy.data.libraries if not lib.packed_file and lib.filepath]
+
+
+def remember_libraries():
+    mtimes = {}
+    for _name, _raw, absolute in library_list():
+        try:
+            mtimes[absolute] = os.path.getmtime(absolute)
+        except OSError:
+            pass
+    STATE["lib_mtimes"] = mtimes
+    STATE["libs_changed"] = set()
+
+
+def check_libraries():
+    """Cada pocos segundos: si Mi carpeta bajó una versión nueva de un .blend
+    enlazado, avisa para recargarlo. Solo mira fechas en el disco."""
+    changed = set()
+    for absolute, mtime in STATE["lib_mtimes"].items():
+        try:
+            if os.path.getmtime(absolute) != mtime:
+                changed.add(absolute)
+        except OSError:
+            pass
+    if changed != STATE["libs_changed"]:
+        STATE["libs_changed"] = changed
+        redraw()
+    return LIBRARY_EVERY
+
+
+def library_by_path(absolute):
+    for lib in bpy.data.libraries:
+        if os.path.normpath(bpy.path.abspath(lib.filepath)) == absolute:
+            return lib
+    return None
+
+
+def broken_libraries(st):
+    """Los enlaces que no se verán en otra PC, según la última revisión."""
+    out = []
+    for item in st.get("libraries") or []:
+        lst = item.get("status")
+        if item["problem"] or (lst and lst["state"] == "new"):
+            out.append(item)
+    return out
 
 
 def outside_files(st):
@@ -157,6 +213,7 @@ def refresh(alert=False, after_save=False, remote=False):
         return
 
     before = STATE["status"]
+    libs = library_list()
 
     def done(st):
         STATE["status"] = st
@@ -175,6 +232,13 @@ def refresh(alert=False, after_save=False, remote=False):
     def work():
         v = get_vault()
         st = v.status(path)
+        st["libraries"] = v.libraries(st, path, libs) if libs else []
+        st["used_by"] = []
+        if st.get("asset"):
+            try:
+                st["used_by"] = v.links(st["asset"]["id"])["used_by"]
+            except vault.VaultError:
+                pass  # un servidor sin esta función: sin la lista
         if STATE.get("addon_update") is None:  # una vez por sesión
             try:
                 STATE["addon_update"] = v.addon_update() or ""
@@ -290,6 +354,10 @@ class THREEDVAULT_OT_upload(bpy.types.Operator):
         self.layout.prop(self, "comment")
         if st and st.get("locked_by_me"):
             self.layout.prop(self, "release")
+        broken = broken_libraries(st) if st else []
+        if broken:
+            names = ", ".join(os.path.basename(i["path"]) for i in broken[:3])
+            wrapped(self.layout, f"Ojo: enlaza {names}, que en otras PCs no se verá. Revísalo en Archivos enlazados.", "ERROR", 50)
 
     def execute(self, _context):
         if len(self.comment.strip()) < 3:
@@ -384,13 +452,25 @@ class THREEDVAULT_OT_open_version(bpy.types.Operator):
 
 class THREEDVAULT_OT_fix_textures(bpy.types.Operator):
     bl_idname = "three_d_vault.fix_textures"
-    bl_label = "Arreglar texturas"
-    bl_description = "Copiar al proyecto (carpeta texturas) las imágenes que están fuera, usar rutas relativas, guardar y subir las texturas nuevas"
+    bl_label = "Arreglar rutas"
+    bl_description = "Usar rutas relativas en texturas y archivos enlazados, copiar al proyecto (carpeta texturas) las imágenes que están fuera, guardar y subir las texturas nuevas"
 
     def execute(self, _context):
         st = STATE["status"]
         root = project_root(st)
         copied, missing = [], []
+        relinked, outside_libs = 0, []
+        for lib in bpy.data.libraries:
+            if lib.packed_file or not lib.filepath:
+                continue
+            absolute = os.path.normpath(bpy.path.abspath(lib.filepath))
+            problem = vault.link_problem(lib.filepath, absolute, sync_root(st))
+            if problem == "absolute":
+                lib.filepath = bpy.path.relpath(absolute)
+                lib.reload()
+                relinked += 1
+            elif problem:
+                outside_libs.append(os.path.basename(absolute))
         for img, absolute, inside in outside_files(st):
             if not inside:
                 if not os.path.isfile(absolute):
@@ -423,9 +503,12 @@ class THREEDVAULT_OT_fix_textures(bpy.types.Operator):
             return sent
 
         def done(sent):
-            text = f"Texturas arregladas: {len(copied)} copiadas a texturas/ ({sent} subidas) y rutas relativas."
+            text = f"Rutas arregladas: {len(copied)} texturas copiadas a texturas/ ({sent} subidas)"
+            text += f", {relinked} archivos enlazados con ruta relativa." if relinked else "."
             if missing:
                 text += f" No se encontraron: {', '.join(missing)}."
+            if outside_libs:
+                text += f" Fuera de 3D-Vault, cópialos a un proyecto y vuelve a enlazarlos: {', '.join(outside_libs)}."
             STATE["notice"] = text + " Ahora sube el .blend."
             refresh()
 
@@ -476,6 +559,109 @@ class THREEDVAULT_OT_test(bpy.types.Operator):
             STATE["notice"] = f"Conectado como {me['display_name']}."
 
         run_job("Conectando", lambda: get_vault().me(), done)
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_reload_library(bpy.types.Operator):
+    bl_idname = "three_d_vault.reload_library"
+    bl_label = "Recargar"
+    bl_description = "Volver a leer este archivo enlazado del disco, para ver sus últimos cambios"
+
+    path: StringProperty()
+
+    def execute(self, _context):
+        lib = library_by_path(self.path)
+        if not lib:
+            self.report({"ERROR"}, "Ese archivo ya no está enlazado.")
+            return {"CANCELLED"}
+        lib.reload()
+        remember_libraries()
+        STATE["notice"] = f"Recargado {os.path.basename(self.path)}."
+        refresh()
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_update_library(bpy.types.Operator):
+    bl_idname = "three_d_vault.update_library"
+    bl_label = "Actualizar y recargar"
+    bl_description = "Bajar la última versión de este archivo enlazado y recargarlo. Solo baja lo que cambió"
+
+    path: StringProperty()
+
+    def execute(self, _context):
+        st = STATE["status"]
+        item = next((i for i in st.get("libraries") or [] if i["path"] == self.path), None)
+        if not item or not item.get("status"):
+            return {"CANCELLED"}
+        lst, path = item["status"], self.path
+
+        def done(copy):
+            lib = library_by_path(path)
+            if lib:
+                lib.reload()
+            remember_libraries()
+            text = f"{os.path.basename(path)} actualizado a v{lst['asset']['head_version']} y recargado."
+            if copy:
+                text += " Tus cambios quedaron en " + copy
+            STATE["notice"] = text
+            refresh()
+
+        run_job("Actualizando el enlazado", lambda: get_vault().update(path, lst, progress), done)
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_upload_library(bpy.types.Operator):
+    bl_idname = "three_d_vault.upload_library"
+    bl_label = "Subir a 3D-Vault"
+    bl_description = "Agregar este archivo enlazado a 3D-Vault, para que los demás lo tengan"
+
+    path: StringProperty()
+
+    def execute(self, _context):
+        st = STATE["status"]
+        item = next((i for i in st.get("libraries") or [] if i["path"] == self.path), None)
+        if not item or not item.get("status"):
+            return {"CANCELLED"}
+        lst, path = item["status"], self.path
+
+        def done(_):
+            STATE["notice"] = f"{os.path.basename(path)} agregado a 3D-Vault."
+            refresh()
+
+        run_job("Subiendo el enlazado", lambda: get_vault().upload(path, lst, "Primera versión", False, progress), done)
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_open_library(bpy.types.Operator):
+    bl_idname = "three_d_vault.open_library"
+    bl_label = "Abrir para editar"
+    bl_description = "Abrir este archivo enlazado para cambiarlo. Bloquéalo antes de editar y súbelo al terminar: los que lo usan verán el cambio al recargar"
+
+    path: StringProperty()
+
+    def invoke(self, context, event):
+        if bpy.data.is_dirty:
+            return context.window_manager.invoke_confirm(self, event, title="Este archivo tiene cambios sin guardar", message="Se guardará antes de abrir el enlazado. ¿Seguir?")
+        return self.execute(context)
+
+    def execute(self, _context):
+        if not os.path.isfile(self.path):
+            self.report({"ERROR"}, "No se encuentra el archivo en esta PC.")
+            return {"CANCELLED"}
+        if bpy.data.is_dirty:
+            bpy.ops.wm.save_mainfile()
+        bpy.ops.wm.open_mainfile(filepath=self.path)
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_link_from_project(bpy.types.Operator):
+    bl_idname = "three_d_vault.link_from_project"
+    bl_label = "Enlazar desde 3D-Vault…"
+    bl_description = "Abrir Archivo → Enlazar en la carpeta del proyecto, con ruta relativa: así el enlace funciona en todas las PCs"
+
+    def execute(self, _context):
+        st = STATE["status"]
+        bpy.ops.wm.link("INVOKE_DEFAULT", directory=project_root(st) + os.sep, relative_path=True)
         return {"FINISHED"}
 
 
@@ -566,12 +752,16 @@ class THREEDVAULT_PT_panel(bpy.types.Panel):
                 col.operator("three_d_vault.request_unlock", icon="HAND")
 
         outside = outside_files(st)
-        if outside and (not asset or st.get("locked_by_me")):
+        absolute_libs = [i for i in st.get("libraries") or [] if i["problem"] == "absolute"]
+        if (outside or absolute_libs) and (not asset or st.get("locked_by_me")):
             tip = layout.box()
-            away = sum(1 for _, _, inside in outside if not inside)
-            text = f"{len(outside)} imagen(es) no viajarán bien con el archivo"
-            text += f" ({away} fuera del proyecto)" if away else " (rutas absolutas)"
-            wrapped(tip, text + ": en otras PCs se verían rosas.", "ERROR")
+            if outside:
+                away = sum(1 for _, _, inside in outside if not inside)
+                text = f"{len(outside)} imagen(es) no viajarán bien con el archivo"
+                text += f" ({away} fuera del proyecto)" if away else " (rutas absolutas)"
+                wrapped(tip, text + ": en otras PCs se verían rosas.", "ERROR")
+            if absolute_libs:
+                wrapped(tip, f"{len(absolute_libs)} archivo(s) enlazado(s) con ruta absoluta: en otras PCs no se encontrarán.", "ERROR")
             tip.operator("three_d_vault.fix_textures", icon="TEXTURE")
 
         if st.get("compressed") and (not asset or st.get("locked_by_me")):
@@ -618,6 +808,80 @@ class THREEDVAULT_PT_versions(bpy.types.Panel):
             wrapped(box, v["comment"], width=40)
 
 
+LIB_STATES = {
+    "current": ("Al día · v{head}", "CHECKMARK"),
+    "outdated": ("Tienes la v{local} · hay v{head} de {by}", "ERROR"),
+    "modified": ("Tiene cambios sin subir en esta PC", "MODIFIER"),
+    "new": ("Falta subirlo: en otras PCs no se verá", "ERROR"),
+}
+LIB_PROBLEMS = {
+    "outside": "Fuera de la carpeta de 3D-Vault: en otras PCs no se verá.",
+    "missing": "No se encuentra en esta PC.",
+    "absolute": "Ruta absoluta: en otras PCs no se encontrará. Usa Arreglar rutas.",
+}
+
+
+class THREEDVAULT_PT_links(bpy.types.Panel):
+    bl_label = "Archivos enlazados"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "3D-Vault"
+    bl_parent_id = "THREEDVAULT_PT_panel"
+
+    @classmethod
+    def poll(cls, _context):
+        return bool(STATE["status"] and STATE["path"] == bpy.data.filepath)
+
+    def draw(self, _context):
+        layout = self.layout
+        st = STATE["status"]
+        busy = bool(STATE["busy"])
+        libs = st.get("libraries") or []
+        if not libs:
+            wrapped(layout, "Este archivo no enlaza otros .blend.", "INFO")
+        for item in libs:
+            box = layout.box()
+            box.label(text=os.path.basename(item["path"]), icon="LINK_BLEND")
+            lst = item.get("status")
+            if item["path"] in STATE["libs_changed"]:
+                wrapped(box, "Cambió en el disco desde que lo cargaste.", "INFO")
+                box.operator("three_d_vault.reload_library", text="Recargar para ver los cambios", icon="FILE_REFRESH").path = item["path"]
+            if item["problem"]:
+                wrapped(box, LIB_PROBLEMS[item["problem"]], "ERROR")
+            if item.get("error"):
+                wrapped(box, item["error"], "ERROR")
+            if lst:
+                asset = lst.get("asset") or {}
+                text, icon = LIB_STATES[lst["state"]]
+                wrapped(box, text.format(head=asset.get("head_version"), local=lst.get("local_version"), by=asset.get("uploaded_by")), icon)
+                if lst.get("lock") and not lst.get("locked_by_me"):
+                    box.label(text=lock_text(lst), icon="LOCKED")
+            row = box.row(align=True)
+            row.enabled = not busy
+            if lst and lst["state"] == "outdated":
+                row.operator("three_d_vault.update_library", icon="IMPORT").path = item["path"]
+            elif lst and lst["state"] == "new" and not item["problem"]:
+                row.operator("three_d_vault.upload_library", icon="EXPORT").path = item["path"]
+            elif item["path"] not in STATE["libs_changed"]:
+                row.operator("three_d_vault.reload_library", icon="FILE_REFRESH").path = item["path"]
+            if os.path.isfile(item["path"]):
+                row.operator("three_d_vault.open_library", icon="FILE_BLEND").path = item["path"]
+
+        users = st.get("used_by") or []
+        if users:
+            box = layout.box()
+            box.label(text=f"Lo usan {len(users)} archivo(s):", icon="LINKED")
+            for u in users[:6]:
+                box.label(text=u["asset"]["path"], icon="BLANK1")
+            if len(users) > 6:
+                box.label(text=f"y {len(users) - 6} más", icon="BLANK1")
+            wrapped(box, "Si subes cambios, los verán al abrirlos o al pulsar Recargar.", "INFO")
+
+        row = layout.row()
+        row.enabled = not busy
+        row.operator("three_d_vault.link_from_project", icon="LINK_BLEND")
+
+
 class THREEDVAULT_Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
@@ -646,6 +910,7 @@ class THREEDVAULT_Preferences(bpy.types.AddonPreferences):
 @persistent
 def on_load(_dummy):
     STATE.update(status=None, error=None, notice=None)
+    remember_libraries()
     if bpy.data.filepath:
         bpy.app.timers.register(lambda: refresh(alert=True), first_interval=0.5)
 
@@ -660,7 +925,10 @@ def on_save(_dummy):
 CLASSES = (
     THREEDVAULT_OT_refresh, THREEDVAULT_OT_lock, THREEDVAULT_OT_unlock, THREEDVAULT_OT_upload,
     THREEDVAULT_OT_update, THREEDVAULT_OT_uncompress, THREEDVAULT_OT_open_web, THREEDVAULT_OT_test, THREEDVAULT_OT_request,
-    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_OT_fix_textures, THREEDVAULT_PT_panel, THREEDVAULT_PT_versions,
+    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_OT_fix_textures,
+    THREEDVAULT_OT_reload_library, THREEDVAULT_OT_update_library, THREEDVAULT_OT_upload_library,
+    THREEDVAULT_OT_open_library, THREEDVAULT_OT_link_from_project,
+    THREEDVAULT_PT_panel, THREEDVAULT_PT_links, THREEDVAULT_PT_versions,
     THREEDVAULT_Preferences,
 )
 
@@ -671,11 +939,13 @@ def register():
     bpy.app.handlers.load_post.append(on_load)
     bpy.app.handlers.save_post.append(on_save)
     bpy.app.timers.register(check_remote, first_interval=REMOTE_EVERY, persistent=True)
+    bpy.app.timers.register(check_libraries, first_interval=LIBRARY_EVERY, persistent=True)
 
 
 def unregister():
-    if bpy.app.timers.is_registered(check_remote):
-        bpy.app.timers.unregister(check_remote)
+    for timer in (check_remote, check_libraries):
+        if bpy.app.timers.is_registered(timer):
+            bpy.app.timers.unregister(timer)
     for handlers, fn in ((bpy.app.handlers.load_post, on_load), (bpy.app.handlers.save_post, on_save)):
         if fn in handlers:
             handlers.remove(fn)

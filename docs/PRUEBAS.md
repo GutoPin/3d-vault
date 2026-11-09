@@ -107,9 +107,24 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | Desplegar **Versiones** y pulsar el botón de ventana de una anterior | Se abre otra ventana de Blender con esa versión; tu archivo no cambia |
 | Con el archivo bloqueado por otro: **Pedir que lo libere** | Le llega el aviso en su Mi carpeta |
 | Con el archivo abierto en Blender, subir una versión desde la otra PC y esperar un minuto | Ventana en Blender: "… subió la vN de este archivo" |
-| Bloquear, añadir a un material una imagen de Descargas y guardar | Aviso de imágenes que no viajarán bien; **Arreglar texturas** las copia a `texturas/`, deja la ruta relativa y las sube |
+| Bloquear, añadir a un material una imagen de Descargas y guardar | Aviso de imágenes que no viajarán bien; **Arreglar rutas** las copia a `texturas/`, deja la ruta relativa y las sube |
 
-## 8. Cuenta, actividad y búsqueda
+## 8. Carpetas y archivos enlazados
+
+| Paso | Debe pasar |
+|---|---|
+| En la página de `Camiones`, **Elegir una carpeta** → una carpeta con una escena, `texturas/` y `maestros/` | Resumen con los archivos nuevos y los temporales que se omiten (`.blend1`). Al subir, aparecen con sus subcarpetas |
+| Repetirlo tras cambiar una textura | El resumen dice que ya existen; la textura cambiada queda en v2 y el resto "sin cambios" |
+| Arrastrar una carpeta desde el Explorador sobre la página del proyecto | Igual que elegirla. **Agregar aquí** en una carpeta de la lista la pone como destino |
+| En Blender: maestro `maestros/camion.blend` con una colección, subido. Escena nueva → **Enlazar desde 3D-Vault…** → la colección del maestro | El panel **Archivos enlazados** muestra `camion.blend` **Al día** |
+| Enlazar también un `.blend` de Descargas | **Fuera de la carpeta de 3D-Vault**. Al subir la escena, el diálogo lo advierte |
+| Subir la escena y abrir su ficha en la web | **Archivos enlazados**: el maestro **En 3D-Vault**, el de Descargas **Fuera de 3D-Vault**. En la lista, "1 enlace roto" y la pestaña **Con enlaces rotos** |
+| Ficha del maestro | **Lo usan**: la escena |
+| **Descargar con todo lo que usa (.zip)** y abrir la escena descomprimida | Se ve el camión enlazado |
+| PC B cambia el maestro y lo sube, con la escena abierta en PC A y Mi carpeta abierta | En A, en unos segundos: **Cambió en el disco** → **Recargar para ver los cambios** muestra el cambio sin cerrar la escena |
+| Lo mismo con Mi carpeta cerrada en A | **Tienes la v1 · hay v2 de …** → **Actualizar y recargar** |
+
+## 9. Cuenta, actividad y búsqueda
 
 | Prueba | Debe pasar |
 |---|---|
@@ -120,7 +135,7 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | **Actividad**, filtrar por proyecto y por persona; "Ver más" | Subidas, bloqueos, movimientos, pedidos de liberar… en español |
 | Buscar `CAMION` y `camion` | Encuentra `camion.blend` y cualquier `Camión…` |
 
-## 9. Administración
+## 10. Administración
 
 | Prueba | Debe pasar |
 |---|---|

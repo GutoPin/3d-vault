@@ -48,26 +48,40 @@ func (s *Server) webProjectZip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	entries := make([]zipEntry, len(assets))
+	for i, a := range assets {
+		entries[i] = zipEntry{name: a.Path, versionID: a.HeadVersionID}
+	}
+	s.writeZip(w, r, project.Name+".zip", entries)
+}
+
+type zipEntry struct {
+	name      string
+	versionID int64
+}
+
+// writeZip envía un .zip con una versión por entrada.
+func (s *Server) writeZip(w http.ResponseWriter, r *http.Request, filename string, entries []zipEntry) {
 	// Sin Content-Length: si se corta, el navegador no puede darlo por bueno.
 	h := w.Header()
 	h.Set("Content-Type", "application/zip")
-	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": project.Name + ".zip"}))
+	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 
 	rc := http.NewResponseController(w)
 	zw := zip.NewWriter(w)
-	for _, a := range assets {
-		file, err := s.svc.GetVersionFile(r.Context(), a.HeadVersionID)
+	for _, e := range entries {
+		file, err := s.svc.GetVersionFile(r.Context(), e.versionID)
 		if err != nil {
-			s.abortZip(r, a.HeadVersionID, err)
+			s.abortZip(r, e.versionID, err)
 		}
-		entry, err := zw.CreateHeader(&zip.FileHeader{Name: a.Path, Method: zip.Store, Modified: file.Version.CreatedAt.Local()})
+		entry, err := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Store, Modified: file.Version.CreatedAt.Local()})
 		if err != nil {
 			return
 		}
 		for _, c := range file.Manifest.Chunks {
 			data, err := s.svc.ReadChunkData(c.SHA256)
 			if err != nil {
-				s.abortZip(r, a.HeadVersionID, err)
+				s.abortZip(r, e.versionID, err)
 			}
 			_ = rc.SetWriteDeadline(time.Now().Add(writeStall))
 			if _, err := entry.Write(data); err != nil {

@@ -1241,7 +1241,7 @@ func TestBuildTree(t *testing.T) {
 		{Path: "texturas/f.png"},
 	}
 	var got []string
-	for _, row := range buildTree(assets) {
+	for _, row := range buildTree(assets, nil) {
 		mark := ""
 		if row.Folder {
 			mark = "/"

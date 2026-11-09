@@ -45,7 +45,13 @@ type Service struct {
 	now         func() time.Time
 	thumbs      *thumbs.Cache
 	// thumbSem limita a una las miniaturas que se generan a la vez.
-	thumbSem   chan struct{}
+	thumbSem chan struct{}
+	// refsSem limita a uno los .blend que se analizan a la vez: se leen enteros.
+	refsSem chan struct{}
+	// bg se cancela al detener el servidor: corta los análisis largos, que se
+	// repiten al volver a arrancar.
+	bg         context.Context
+	stopBg     context.CancelFunc
 	background sync.WaitGroup
 	// afterVerify se llama tras verificar un manifiesto, antes de la transacción
 	// final. Solo lo usan los tests, para simular cambios durante la verificación.
@@ -58,6 +64,7 @@ func New(cfg Config) *Service {
 	if now == nil {
 		now = time.Now
 	}
+	bg, stopBg := context.WithCancel(context.Background())
 	return &Service{
 		db:          cfg.DB,
 		store:       cfg.Store,
@@ -67,6 +74,9 @@ func New(cfg Config) *Service {
 		now:         now,
 		thumbs:      cfg.Thumbs,
 		thumbSem:    make(chan struct{}, 1),
+		refsSem:     make(chan struct{}, 1),
+		bg:          bg,
+		stopBg:      stopBg,
 	}
 }
 

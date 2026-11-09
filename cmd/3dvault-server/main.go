@@ -252,6 +252,8 @@ func serve(ctx context.Context) error {
 	})
 	// Antes de cerrar el almacén: las miniaturas en curso leen trozos.
 	defer svc.WaitBackground()
+	// Los .blend subidos antes de que se leyeran sus enlaces.
+	svc.ScanMissingRefs(ctx)
 
 	hasAdmin, err := svc.HasAdmin(ctx)
 	if err != nil {

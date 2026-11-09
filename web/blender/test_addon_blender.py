@@ -68,8 +68,9 @@ class FakeLayout:
 def draw_panels():
     seen = []
     addon.THREEDVAULT_PT_panel.draw(types.SimpleNamespace(layout=FakeLayout(seen)), bpy.context)
-    if addon.THREEDVAULT_PT_versions.poll(bpy.context):
-        addon.THREEDVAULT_PT_versions.draw(types.SimpleNamespace(layout=FakeLayout(seen)), bpy.context)
+    for panel in (addon.THREEDVAULT_PT_links, addon.THREEDVAULT_PT_versions):
+        if panel.poll(bpy.context):
+            panel.draw(types.SimpleNamespace(layout=FakeLayout(seen)), bpy.context)
     return " ".join(seen)
 
 
@@ -271,16 +272,121 @@ def run(data):
     assert addon.outside_files(st["status"]) == []
     paths = [a["path"] for a in call("GET", "/api/projects/1/snapshot", token=guto)["assets"]]
     assert "texturas/chapa.png" in paths, paths
-    step(f"Arreglar texturas: {st['notice']}")
+    step(f"Arreglar rutas (texturas): {st['notice']}")
+
+    run_links(data, guto, other)
 
     vault.own_version = lambda: "0.9.0"
     st["addon_update"] = None
     addon.refresh()
-    assert st["addon_update"] == "1.1.0", st["addon_update"]
+    assert st["addon_update"] == "1.2.0", st["addon_update"]
     assert "[three_d_vault.get_addon]" in draw_panels()
     step("Avisa cuando el servidor tiene una versión más nueva del complemento")
 
     addon.unregister()
+
+
+def save_master(path, objects):
+    """Un maestro: la colección «Camion» con objects mallas."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    coll = bpy.data.collections.new("Camion")
+    bpy.context.scene.collection.children.link(coll)
+    for i in range(objects):
+        mesh = bpy.data.meshes.new(f"pieza{i}")
+        mesh.from_pydata([(i, 0, 0), (i + 1, 0, 0), (i, 1, 0)], [], [(0, 1, 2)])
+        coll.objects.link(bpy.data.objects.new(f"Pieza{i}", mesh))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    bpy.ops.wm.save_as_mainfile(filepath=path)
+
+
+def link_collection(master, relative):
+    with bpy.data.libraries.load(master, link=True, relative=relative) as (_src, dst):
+        dst.collections = ["Camion"]
+    inst = bpy.data.objects.new(os.path.basename(master), None)
+    inst.instance_type = "COLLECTION"
+    inst.instance_collection = dst.collections[0]
+    bpy.context.scene.collection.objects.link(inst)
+
+
+def run_links(data, guto, other):
+    """Archivos enlazados: una escena que usa maestros del proyecto."""
+    st = addon.STATE
+    project = os.path.join(data, "3D-Vault", "Camiones")
+    master = os.path.join(project, "maestros", "camion_maestro.blend")
+    grua = os.path.join(project, "maestros", "grua.blend")
+    scene = os.path.join(project, "escenas", "escena_01.blend")
+
+    save_master(master, 1)
+    addon.refresh()
+    bpy.ops.three_d_vault.upload(comment="Maestro del camión")
+    assert st["status"]["state"] == "current", (st["error"], st["status"])
+    save_master(grua, 1)  # sin subir
+
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    os.makedirs(os.path.dirname(scene))
+    bpy.ops.wm.save_as_mainfile(filepath=scene)
+    link_collection(master, relative=True)
+    link_collection(grua, relative=False)  # ruta absoluta: solo sirve en esta PC
+    bpy.ops.wm.save_mainfile()
+    addon.remember_libraries()
+    addon.refresh()
+    libs = {os.path.basename(i["path"]): i for i in st["status"]["libraries"]}
+    assert libs["camion_maestro.blend"]["problem"] is None and libs["camion_maestro.blend"]["status"]["state"] == "current", libs
+    assert libs["grua.blend"]["problem"] == "absolute" and libs["grua.blend"]["status"]["state"] == "new", libs
+    shown = draw_panels()
+    assert "Ruta absoluta" in shown and "Falta subirlo" in shown and "[three_d_vault.open_library]" in shown, shown
+    assert "[three_d_vault.fix_textures]" in shown and "[three_d_vault.link_from_project]" in shown, shown
+    step("Archivos enlazados: el panel muestra el maestro al día y la grúa con ruta absoluta y sin subir")
+
+    bpy.ops.three_d_vault.fix_textures()
+    lib = addon.library_by_path(grua)
+    assert lib and lib.filepath.startswith("//"), (lib and lib.filepath, st["error"])
+    assert "1 archivos enlazados con ruta relativa" in st["notice"], st["notice"]
+    bpy.ops.three_d_vault.upload_library(path=grua)
+    libs = {os.path.basename(i["path"]): i for i in st["status"]["libraries"]}
+    assert libs["grua.blend"]["problem"] is None and libs["grua.blend"]["status"]["state"] == "current", (st["error"], libs)
+    assert addon.broken_libraries(st["status"]) == []
+    step(f"Arreglar rutas y subir el enlazado que faltaba: {st['notice']}")
+
+    bpy.ops.three_d_vault.upload(comment="Escena con el camión y la grúa")
+    scene_id = st["status"]["asset"]["id"]
+    for _ in range(100):
+        links = call("GET", f"/api/assets/{scene_id}/links", token=guto)
+        if not links.get("pending"):
+            break
+        time.sleep(0.1)
+    assert sorted(l["status"] for l in links["uses"]) == ["ok", "ok"], links
+    bpy.ops.wm.open_mainfile(filepath=master)
+    addon.refresh()
+    assert [u["asset"]["path"] for u in st["status"]["used_by"]] == ["escenas/escena_01.blend"], st["status"]["used_by"]
+    assert "Lo usan 1 archivo(s):" in draw_panels()
+    step("El maestro sabe que lo usa escenas/escena_01.blend")
+
+    # Ana agrega una pieza al maestro. Sin Mi carpeta abierta, la escena de Guto
+    # lo ve como desactualizado y lo baja y recarga sin cerrar la escena.
+    ana_master = os.path.join(data, "ana", "Camiones", "maestros", "camion_maestro.blend")
+    os.makedirs(os.path.dirname(ana_master), exist_ok=True)
+    save_master(ana_master, 2)
+    other.lock(other.status(ana_master))
+    other.upload(ana_master, other.status(ana_master), "Otra pieza", True)
+
+    bpy.ops.wm.open_mainfile(filepath=scene)
+    addon.refresh()
+    libs = {os.path.basename(i["path"]): i for i in st["status"]["libraries"]}
+    assert libs["camion_maestro.blend"]["status"]["state"] == "outdated", libs
+    assert "[three_d_vault.update_library]" in draw_panels()
+    bpy.ops.three_d_vault.update_library(path=master)
+    camion = next(c for c in bpy.data.collections if c.library and c.library.filepath.endswith("camion_maestro.blend"))
+    assert len(camion.objects) == 2, [o.name for o in camion.objects]
+    step(f"Actualizar un enlazado sin cerrar la escena: {st['notice']}")
+
+    # Si Mi carpeta lo baja por su cuenta, Blender avisa para recargar.
+    os.utime(grua, (time.time() + 5, time.time() + 5))
+    addon.check_libraries()
+    assert grua in st["libs_changed"] and "Recargar para ver los cambios" in draw_panels(), st["libs_changed"]
+    bpy.ops.three_d_vault.reload_library(path=grua)
+    assert not st["libs_changed"], st["libs_changed"]
+    step("Avisa cuando un enlazado cambia en el disco y lo recarga")
 
 
 if __name__ == "__main__":
