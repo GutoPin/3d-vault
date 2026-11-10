@@ -5,7 +5,7 @@ import "net/http"
 // Temas de la guía, en el orden de sus pestañas.
 var guideTopics = []struct{ Key, Label string }{
 	{"enlaces", "Archivos enlazados"},
-	{"carpetas", "Subir carpetas"},
+	{"carpetas", "Carpetas"},
 	{"problemas", "Si algo no se ve"},
 }
 

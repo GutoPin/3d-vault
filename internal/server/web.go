@@ -48,7 +48,7 @@ func loadPages() (*pageSet, error) {
 		"plural":        plural,
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide", "trash"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -208,6 +208,8 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Post("/projects", s.webCreateProject)
 		r.Get("/projects/{id}", s.webProject)
 		r.Get("/projects/{id}/download.zip", s.webProjectZip)
+		r.Get("/projects/{id}/papelera", s.webTrash)
+		r.Post("/projects/{id}/papelera/{asset}/recuperar", s.webUndelete)
 		r.Get("/assets/{id}/with-links.zip", s.webLinkedZip)
 		r.Get("/assets/{id}", s.webAsset)
 		r.Post("/assets/{id}/lock", s.webLock)

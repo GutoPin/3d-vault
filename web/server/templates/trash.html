@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="title-row">
+  <div>
+    <div class="crumbs"><a href="/">Proyectos</a><span>/</span><a href="/projects/{{.Data.Project.ID}}">{{.Data.Project.Name}}</a></div>
+    <h1>Papelera</h1>
+    <p class="sub">Los archivos borrados de {{.Data.Project.Name}}, con todo su historial. Recupera uno y vuelve a su carpeta para todos.</p>
+  </div>
+</div>
+{{with .Data.Restored}}<p class="notice ok" role="status">Recuperado: <span class="path">{{.}}</span>. Mi carpeta lo bajará en cada PC.</p>{{end}}
+<div class="panel table-panel">
+  {{if .Data.Files}}
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Archivo</th><th class="n">Versión</th><th class="n">Tamaño</th><th class="n">Borrado</th><th></th></tr></thead>
+      <tbody>
+      {{range .Data.Files}}
+        <tr>
+          <td><span class="path">{{.Path}}</span></td>
+          <td class="n" data-label="Versión:">v{{.HeadVersion}}</td>
+          <td class="n" data-label="Tamaño:">{{formatBytes .SizeBytes}}</td>
+          <td class="n">{{when .DeletedAt}}</td>
+          <td class="row-actions">{{if .Free}}<form method="post" action="/projects/{{$.Data.Project.ID}}/papelera/{{.ID}}/recuperar"><button class="btn" type="submit">Recuperar</button></form>{{else}}<span class="sub" title="Muévelo o bórralo antes de recuperar este">Hay otro archivo en esa ruta</span>{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="empty">La papelera está vacía.</p>
+  {{end}}
+</div>
+<p class="sub trash-note">Los archivos quedan aquí hasta que un administrador los purgue para liberar espacio.</p>
+{{end}}

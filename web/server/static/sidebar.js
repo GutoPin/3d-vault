@@ -5,6 +5,8 @@
 //
 // Qué está desplegado se recuerda en este navegador (localStorage).
 
+import { deleteFolder, renameFolder } from './folder-actions.js';
+
 const STORE = '3dvault-arbol';
 const REFRESH_MS = 30000;
 const collator = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
@@ -45,6 +47,7 @@ const ICON = {
   file: ['M4 2h5l3 3v9H4z', 'M9 2v3h3'],
   add: ['M2 4.5h4l1.5 1.5H14v6.5H2z', 'M8 7.5v4M6 9.5h4'],
   trash: ['M3 4.5h10', 'M6.5 4.5V3h3v1.5', 'M4.5 4.5l.7 9h5.6l.7-9'],
+  rename: ['M3 13l.6-2.6L10.5 3.5l2 2-6.9 6.9z', 'M9.5 4.5l2 2'],
 };
 
 function el(tag, attrs = {}, ...children) {
@@ -154,7 +157,8 @@ class ProjectTree {
       f.count ? el('span', { class: 'tree-count' }, String(f.count)) : el('span', { class: 'tree-count' }, 'vacía'));
     const actions = el('span', { class: 'tree-actions' },
       el('button', { class: 'tree-act', type: 'button', 'data-new-folder': f.path, title: `Nueva carpeta dentro de ${f.name}`, 'aria-label': `Nueva carpeta dentro de ${f.name}` }, svg(ICON.add)),
-      f.count === 0 ? el('button', { class: 'tree-act', type: 'button', 'data-delete-folder': f.path, title: `Borrar la carpeta ${f.name}`, 'aria-label': `Borrar la carpeta ${f.name}` }, svg(ICON.trash)) : null);
+      el('button', { class: 'tree-act', type: 'button', 'data-rename-folder': f.path, title: `Renombrar ${f.name}`, 'aria-label': `Renombrar la carpeta ${f.name}` }, svg(ICON.rename)),
+      el('button', { class: 'tree-act', type: 'button', 'data-delete-folder': f.path, title: `Borrar ${f.name}`, 'aria-label': `Borrar la carpeta ${f.name}` }, svg(ICON.trash)));
     const li = el('li', { 'data-path': f.path }, el('div', { class: 'tree-row tree-folder', depth: String(depth) }, name, actions), children);
     let filled = false;
     const fillOnce = () => {
@@ -234,15 +238,14 @@ class ProjectTree {
     });
   }
 
-  async deleteFolder(path) {
-    if (!confirm(`¿Borrar la carpeta «${path}»? Está vacía. También se quitará de Mi carpeta en cada PC.`)) return;
-    const res = await fetch(`/api/projects/${this.id}/folders?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      alert(body.message || `No se pudo borrar (error ${res.status}).`);
+  // afterChange vuelve a cargar el árbol y, si la página muestra este proyecto,
+  // también la página: una carpeta renombrada cambia sus rutas.
+  async afterChange() {
+    if (this.box.hasAttribute('data-active')) {
+      location.reload();
+      return;
     }
     await this.load();
-    document.dispatchEvent(new CustomEvent('3dvault:folders', { detail: { project: this.id } }));
   }
 }
 
@@ -266,14 +269,21 @@ for (const [id, tree] of trees) {
   if (open.has(openKey(id, '')) || (active && current)) tree.toggle(true);
 }
 
-document.querySelector('.sidebar')?.addEventListener('click', (e) => {
+document.querySelector('.sidebar')?.addEventListener('click', async (e) => {
   const add = e.target.closest('[data-new-folder]');
+  const ren = e.target.closest('[data-rename-folder]');
   const del = e.target.closest('[data-delete-folder]');
-  const tree = trees.get((add || del)?.closest('.nav-project')?.dataset.project);
+  const tree = trees.get((add || ren || del)?.closest('.nav-project')?.dataset.project);
   if (!tree) return;
   e.preventDefault();
-  if (add) tree.newFolder(add.dataset.newFolder);
-  else tree.deleteFolder(del.dataset.deleteFolder);
+  e.stopPropagation();
+  if (add) return tree.newFolder(add.dataset.newFolder);
+  try {
+    const done = ren ? await renameFolder(tree.id, ren.dataset.renameFolder) : await deleteFolder(tree.id, del.dataset.deleteFolder);
+    if (done) await tree.afterChange();
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 // Lo que cambian otros (o Mi carpeta en otra PC) aparece al volver a la pestaña

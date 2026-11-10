@@ -8,6 +8,7 @@
   <div class="actions">
     <button class="btn" type="button" data-page-new-folder="">Nueva carpeta</button>
     <a class="btn" href="/activity?project={{.Data.Project.ID}}">Actividad</a>
+    <a class="btn" href="/projects/{{.Data.Project.ID}}/papelera">Papelera</a>
     {{if .Data.HasFiles}}<a class="btn" href="/projects/{{.Data.Project.ID}}/download.zip" title="La última versión de cada archivo, con sus carpetas">Descargar todo (.zip)</a>{{end}}
   </div>
 </div>
@@ -34,7 +35,7 @@
           <tbody>
           {{range .Data.Rows}}
             {{if .Folder}}
-            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> {{if not .Empty}}<a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a>{{end}} <button class="text-action folder-zip" type="button" data-upload-here="{{.Prefix}}" aria-label="Agregar archivos a la carpeta {{.Name}}">Agregar aquí</button> <button class="text-action folder-zip" type="button" data-page-new-folder="{{.Prefix}}" aria-label="Nueva carpeta dentro de {{.Name}}">Nueva carpeta</button>{{if .Empty}} <button class="text-action folder-zip" type="button" data-page-delete-folder="{{.Prefix}}" aria-label="Borrar la carpeta vacía {{.Name}}">Borrar</button> <span class="pill">Vacía</span>{{end}}</span></td></tr>
+            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> {{if not .Empty}}<a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a>{{end}} <button class="text-action folder-zip" type="button" data-upload-here="{{.Prefix}}" aria-label="Agregar archivos a la carpeta {{.Name}}">Agregar aquí</button> <button class="text-action folder-zip" type="button" data-page-new-folder="{{.Prefix}}" aria-label="Nueva carpeta dentro de {{.Name}}">Nueva carpeta</button> <button class="text-action folder-zip" type="button" data-rename-folder="{{.Prefix}}" aria-label="Cambiar el nombre de la carpeta {{.Name}}">Renombrar</button> <button class="text-action folder-zip" type="button" data-delete-folder="{{.Prefix}}" aria-label="Borrar la carpeta {{.Name}}">Borrar</button>{{if .Empty}} <span class="pill">Vacía</span>{{end}}</span></td></tr>
             {{else}}
             <tr>
               <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a>{{with .Links}}{{if .Broken}}<span class="pill warn link-mark" title="Usa archivos que en otras PCs no se encontrarán">{{plural .Broken "enlace roto" "enlaces rotos"}}</span>{{end}}{{if .UsedBy}}<span class="pill link-mark" title="Otros .blend enlazan este archivo">Lo usan {{.UsedBy}}</span>{{end}}{{end}}</span></td>
@@ -76,21 +77,6 @@
     <div class="wide form-foot upload-foot"><span class="sub" data-status role="status"></span><button class="btn primary" type="submit">Agregar</button></div>
   </form>
 </section>
-<dialog class="panel" id="folder-dialog">
-  <form method="dialog" class="form-grid">
-    <h2 class="wide">Nueva carpeta</h2>
-    <div class="field wide">
-      <label for="folder-name">Nombre</label>
-      <input class="input" id="folder-name" maxlength="500" autocomplete="off" required>
-      <span class="hint" id="folder-where">En la raíz del proyecto. Puedes escribir varias, por ejemplo <code>ASSETS/Vehículos</code>.</span>
-    </div>
-    <p class="sync-error wide" id="folder-error" role="alert" hidden></p>
-    <div class="wide form-foot">
-      <button class="btn ghost" type="button" value="cancel" data-close>Cancelar</button>
-      <button class="btn primary" type="submit" value="ok">Crear</button>
-    </div>
-  </form>
-</dialog>
 <script type="module" src="/static/upload.js"></script>
 <script type="module" src="/static/folders.js"></script>
 {{end}}

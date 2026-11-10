@@ -124,40 +124,52 @@
 {{else if eq .Data.Topic "carpetas"}}
 <article class="guide">
   <section>
+    <h2>Cómo funcionan las carpetas</h2>
+    <p>Cada proyecto es una carpeta. Lo que hay dentro es <strong>igual en la web y en la carpeta de 3D-Vault de cada PC</strong>: si cambias algo en un lado, Mi carpeta lo repite en el otro en unos segundos. Para eso, Mi carpeta tiene que estar abierta en esa PC.</p>
+    <pre class="guide-tree">Web: Mina Toquepala            Tu PC: 3D-Vault\Mina Toquepala
+├── ASSETS/                    ├── ASSETS\
+│   └── camion.blend    ⇄      │   └── camion.blend
+└── ESCENAS/                   └── ESCENAS\
+    └── panoramica.blend           └── panoramica.blend</pre>
+    <p>En el menú de la izquierda, la flecha junto a cada proyecto muestra sus carpetas y archivos. Pasa el ratón sobre una carpeta para ver sus botones: <strong>carpeta con +</strong> (nueva carpeta dentro), <strong>lápiz</strong> (renombrar) y <strong>papelera</strong> (borrar). En la página del proyecto están los mismos botones, escritos, en cada carpeta.</p>
+  </section>
+
+  <section>
+    <h2>Qué hacer en cada caso</h2>
+    <div class="panel table-panel">
+      <table class="stack-table guide-table">
+        <thead><tr><th>Quiero…</th><th>En la web</th><th>En mi PC</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Crear una carpeta</strong></td><td>Carpeta con + en el menú, o <strong>Nueva carpeta</strong> en el proyecto</td><td>Créala en el Explorador dentro del proyecto. Aparece en la web, aunque esté vacía</td></tr>
+          <tr><td><strong>Cambiarle el nombre</strong></td><td>Lápiz en el menú, o <strong>Renombrar</strong> en el proyecto. Sus archivos van con ella, con su historial</td><td>Mejor hazlo en la web: así cada PC la renombra sin volver a descargar nada</td></tr>
+          <tr><td><strong>Borrar una carpeta vacía</strong></td><td>Papelera en el menú, o <strong>Borrar</strong> en el proyecto</td><td>Bórrala en el Explorador. Se borra también en la web</td></tr>
+          <tr><td><strong>Borrar una carpeta con archivos</strong></td><td><strong>Borrar</strong>: sus archivos van a la <strong>Papelera</strong> del proyecto</td><td>Hazlo en la web. Si la borras en el Explorador, sus archivos vuelven a aparecer como «No está en tu carpeta», para que no se pierdan</td></tr>
+          <tr><td><strong>Recuperar algo borrado</strong></td><td>En el proyecto, botón <strong>Papelera</strong> → <strong>Recuperar</strong>. Vuelve a su carpeta con su historial</td><td>Mi carpeta lo vuelve a bajar</td></tr>
+          <tr><td><strong>Subir una carpeta que ya tengo</strong></td><td>En el proyecto, <strong>Elegir una carpeta</strong>, o arrástrala sobre la página</td><td>Cópiala dentro del proyecto y pulsa <strong>Subir todo</strong> en Mi carpeta</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Antes de renombrar o borrar</h2>
+    <p>El diálogo te dice qué va a pasar antes de hacer nada:</p>
+    <ul class="guide-steps">
+      <li><strong>Cuántos archivos</strong> se mueven o van a la papelera.</li>
+      <li><strong>Archivos bloqueados por otra persona:</strong> mientras alguien esté editando algo de dentro, la carpeta no se puede renombrar ni borrar. Pídele que lo libere.</li>
+      <li><strong>Escenas que usan algo de dentro:</strong> si renombras o borras una carpeta de maestros, las escenas que los enlazan dejan de encontrarlos. Habrá que volver a enlazarlos, o deshacer el cambio con el mismo nombre de antes.</li>
+    </ul>
+    <p class="guide-tip"><strong>Regla simple:</strong> decide los nombres de las carpetas al empezar el proyecto (por ejemplo <code>ASSETS</code>, <code>ESCENAS</code>, <code>TEXTURAS</code>, <code>RENDERS</code>) y evita renombrar las que tienen maestros.</p>
+  </section>
+
+  <section>
     <h2>Subir una carpeta entera desde la web</h2>
-    <p>Sirve para traer de una vez un trabajo que ya tienes ordenado: escenas, maestros y texturas, con sus subcarpetas. Las subcarpetas se conservan, así que los enlaces y las texturas con ruta relativa siguen funcionando.</p>
     <ol class="guide-steps">
-      <li>Abre el proyecto en el menú de la izquierda.</li>
-      <li>Abajo, en <strong>Agregar archivos o carpetas</strong>, pulsa <span class="btn-like">Elegir una carpeta</span>. También puedes arrastrar la carpeta desde el Explorador de Windows y soltarla sobre la página.</li>
-      <li>Deja <strong>Carpeta dentro del proyecto</strong> vacía para ponerla en la raíz del proyecto, o escribe dónde va. Cada carpeta de la lista tiene <strong>Agregar aquí</strong>, que la rellena por ti.</li>
-      <li>Pulsa <span class="btn-like">Agregar</span>. Verás un resumen antes de subir nada:
-        <ul>
-          <li><strong>Archivos nuevos</strong>: se agregan.</li>
-          <li><strong>Archivos que ya existen</strong>: reciben una versión nueva solo si cambiaron.</li>
-          <li><strong>Bloqueados por otra persona</strong>: no se tocan.</li>
-          <li><strong>Temporales</strong> de Blender o del sistema (<code>.blend1</code>, <code>Thumbs.db</code>…): se omiten.</li>
-        </ul>
-      </li>
-      <li>Pulsa <span class="btn-like">Subir</span>. Solo viaja lo que el servidor no tenga.</li>
+      <li>Abre el proyecto. Abajo, en <strong>Agregar archivos o carpetas</strong>, pulsa <span class="btn-like">Elegir una carpeta</span>, o arrastra la carpeta desde el Explorador sobre la página.</li>
+      <li>Deja <strong>Carpeta dentro del proyecto</strong> vacía para ponerla en la raíz, o pulsa <strong>Agregar aquí</strong> en una carpeta de la lista.</li>
+      <li>Pulsa <span class="btn-like">Agregar</span>. Antes de subir verás qué es nuevo, qué ya existe (recibe una versión nueva si cambió), qué está bloqueado por otra persona (no se toca) y qué temporales se omiten (<code>.blend1</code>…).</li>
     </ol>
-    <p class="guide-tip"><strong>Respeta la estructura original.</strong> Si tus escenas están en <code>ESCENAS/</code> y enlazan maestros de <code>ASSETS/</code>, sube las dos carpetas a la raíz del mismo proyecto. Así quedan una al lado de la otra, como en tu PC.</p>
-  </section>
-
-  <section>
-    <h2>Ver y crear carpetas desde el menú</h2>
-    <p>En el menú de la izquierda, la flecha junto a cada proyecto despliega sus carpetas y archivos, como el explorador de un editor de código. Pulsa una carpeta para abrirla y un archivo para ver su ficha. El menú recuerda lo que dejaste abierto.</p>
-    <ol class="guide-steps">
-      <li>Pasa el ratón sobre el proyecto o sobre una carpeta y pulsa el ícono de <strong>carpeta con +</strong>.</li>
-      <li>Escribe el nombre y pulsa <kbd>Enter</kbd> (<kbd>Esc</kbd> cancela).</li>
-      <li>La carpeta aparece al momento en la web y, en unos segundos, en la carpeta de 3D-Vault de cada PC que tenga ese proyecto en Mi carpeta.</li>
-    </ol>
-    <p>También funciona al revés: si creas una carpeta en el Explorador de Windows dentro de un proyecto, Mi carpeta la crea en la web. Si borras una carpeta <strong>vacía</strong>, en la web (ícono de papelera) o en tu PC, se borra en todas partes. Una carpeta con archivos nunca se borra sola: primero hay que borrar o mover sus archivos.</p>
-    <p class="guide-tip">En la página de cada proyecto también tienes <strong>Nueva carpeta</strong>, arriba y en cada carpeta de la lista. Puedes escribir varias de una vez, por ejemplo <code>ASSETS/Vehículos</code>.</p>
-  </section>
-
-  <section>
-    <h2>Con Mi carpeta</h2>
-    <p>Si usas <a href="/sync">Mi carpeta</a>, arrastra las carpetas sobre la tabla del proyecto: se copian a tu carpeta sincronizada y te pide un comentario para subirlas todas.</p>
+    <p class="guide-tip"><strong>Respeta la estructura original.</strong> Si tus escenas están en <code>ESCENAS/</code> y enlazan maestros de <code>ASSETS/</code>, sube las dos carpetas a la raíz del mismo proyecto, una al lado de la otra, como en tu PC.</p>
   </section>
 </article>
 

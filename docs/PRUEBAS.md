@@ -126,6 +126,9 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | Menú de la izquierda: flecha junto a `Camiones` | Se despliegan sus carpetas y archivos; el archivo abierto queda marcado |
 | Ícono de carpeta con + sobre `Camiones` → `ASSETS` → Enter | `ASSETS` aparece "vacía" en el menú y en la tabla, y en segundos en la carpeta de PC A y PC B |
 | PC B: crear en el Explorador `Camiones\RENDERS` | Aparece en la web como carpeta vacía |
+| Web: **Renombrar** `ASSETS` → `MAQUINAS` | El diálogo dice cuántos archivos se mueven y qué escenas pierden sus enlaces. En PC A y B se mueve la carpeta sin descargar nada |
+| Web: **Borrar** `MAQUINAS` | Los archivos van a la **Papelera** del proyecto y se quitan de las PCs. **Recuperar** uno lo devuelve a su carpeta y a las PCs |
+| Con un archivo de dentro bloqueado por otra persona: **Renombrar** o **Borrar** | El diálogo lo avisa y no deja continuar |
 | PC B: borrar `RENDERS` en el Explorador | Desaparece de la web y de PC A. Una carpeta con archivos no se borra |
 
 ## 9. Cuenta, actividad y búsqueda

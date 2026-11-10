@@ -192,6 +192,8 @@ export class Project {
       if (todo.length && !(await confirmFirst(todo.length, bytes))) return this.rows;
     }
 
+    await this.followServerMoves(snap, local, states);
+
     for (const asset of snap.assets) {
       const key = keyOf(asset.path);
       const row = { key, asset, local: local.get(key), rec: states.get(key) };
@@ -227,6 +229,49 @@ export class Project {
     rows.sort((a, b) => (a.asset?.path ?? a.local.path).localeCompare(b.asset?.path ?? b.local.path));
     this.rows = rows.filter((r) => !r.movedTo);
     return this.rows;
+  }
+
+  // followServerMoves aplica en el disco lo que se movió en el servidor, por
+  // ejemplo al renombrar una carpeta: el archivo local se cambia de lugar en vez
+  // de bajarlo de nuevo. Solo si no tiene cambios sin subir; si los tiene, queda
+  // donde estaba y se ve como "Nuevo" junto al del servidor, sin perder nada.
+  async followServerMoves(snap, local, states) {
+    const byAsset = new Map([...states.values()].map((r) => [r.assetId, r]));
+    for (const asset of snap.assets) {
+      const key = keyOf(asset.path);
+      const rec = byAsset.get(asset.id);
+      if (!rec || rec.key === key || states.has(key) || local.has(key)) continue;
+      const old = local.get(rec.key);
+      if (!old) continue;
+      const file = await old.handle.getFile();
+      if (!sameFile(rec, file)) continue;
+      const { dir, name } = await parentOf(this.root, asset.path, true);
+      let handle;
+      if (typeof old.handle.move === 'function') {
+        try {
+          await old.handle.move(dir, name);
+          handle = old.handle;
+        } catch {
+          handle = null; // sin move() en esta carpeta: se copia
+        }
+      }
+      if (!handle) {
+        handle = await dir.getFileHandle(name, { create: true });
+        const out = await handle.createWritable();
+        await file.stream().pipeTo(out);
+        await old.parent.removeEntry(old.name);
+      }
+      const moved = await handle.getFile();
+      await this.state.delete(rec.key);
+      const next = { ...rec, key, path: asset.path, size: moved.size, mtime: moved.lastModified };
+      await this.state.put(next);
+      states.delete(rec.key);
+      states.set(key, next);
+      local.delete(rec.key);
+      local.set(key, { path: asset.path, handle, parent: dir, name });
+      this.scans.delete(rec.key);
+      this.log(`${rec.path} se movió a ${asset.path}.`);
+    }
   }
 
   // syncFolders iguala las carpetas, también las vacías. Una carpeta nueva en un

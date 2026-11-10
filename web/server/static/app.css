@@ -515,3 +515,9 @@ ul.guide-steps { list-style: disc; }
   .tree-row, .tree-name { min-height: 38px; }
   .tree-act, .tree-twisty { width: 34px; height: 34px; }
 }
+.trash-note { margin-top: var(--gap); }
+.btn.danger { background: var(--negative); color: #fff; border-color: transparent; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.folder-dialog { width: min(560px, calc(100vw - 32px)); }
+.folder-info { display: grid; gap: 8px; }
+.folder-info .notice { margin: 0; }

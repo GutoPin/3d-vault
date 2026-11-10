@@ -287,7 +287,7 @@ try {
   const folders = () => a.evaluate(() => fetch('/api/projects/1/snapshot').then((r) => r.json()).then((s) => s.folders.map((f) => f.path)));
   await until(async () => (await folders()).includes('ESCENAS/Nuevas'), 'ESCENAS/Nuevas en el servidor');
   await a.goto(`${BASE}/projects/1`);
-  await a.waitForSelector('[data-page-delete-folder="ESCENAS/Nuevas/"]');
+  await a.waitForSelector('[data-delete-folder="ESCENAS/Nuevas/"]');
   await a.waitForSelector('.nav-project[data-project="1"] [data-path="ESCENAS"]');
   step('Una carpeta vacía creada en la PC de B aparece en la web, en la tabla y en el árbol');
 
@@ -297,11 +297,41 @@ try {
   assert.ok((await folders()).includes('ASSETS'));
   step('Borrar una carpeta vacía en la PC de B la borra en el servidor');
 
-  await a.click('[data-page-delete-folder="ESCENAS/Nuevas/"]');
+  await a.click('[data-delete-folder="ESCENAS/Nuevas/"]');
+  await a.click('.folder-dialog button[type=submit]');
   await a.waitForLoadState();
   await until(async () => !(await b.evaluate(() => dirs())).includes('ESCENAS/Nuevas'), 'ESCENAS/Nuevas quitada en B');
   assert.ok((await b.evaluate(() => dirs())).includes('ASSETS'));
   step('Borrar una carpeta vacía en la web la quita de la carpeta de B');
+
+  // Renombrar una carpeta con archivos desde la web: B los cambia de lugar en su
+  // disco sin volver a bajarlos.
+  const sha = await b.evaluate(() => readHash('modelos/camion_797F.blend'));
+  const gets = chunkGets.length;
+  await a.goto(`${BASE}/projects/1`);
+  await a.click('[data-rename-folder="modelos/"]');
+  await a.waitForSelector('.folder-dialog #carpeta-nombre');
+  await a.fill('.folder-dialog #carpeta-nombre', 'MAQUINAS');
+  await a.click('.folder-dialog button[type=submit]');
+  await a.waitForSelector('[data-rename-folder="MAQUINAS/"]');
+  await until(async () => (await b.evaluate(() => list())).includes('MAQUINAS/camion_797F.blend'), 'MAQUINAS/camion_797F.blend en B');
+  assert.equal(await b.evaluate(() => readHash('MAQUINAS/camion_797F.blend')), sha);
+  await until(async () => !(await b.evaluate(() => dirs())).includes('modelos'), 'modelos quitada en B');
+  assert.equal(chunkGets.length, gets, 'B volvió a bajar trozos al renombrar');
+  step('Renombrar una carpeta en la web mueve sus archivos en B sin volver a bajarlos');
+
+  // Borrar una carpeta con archivos: van a la papelera y se quitan de B. Recuperar
+  // uno lo devuelve.
+  await a.click('[data-delete-folder="MAQUINAS/"]');
+  await a.waitForSelector('.folder-dialog >> text=Papelera del proyecto');
+  await a.click('.folder-dialog button[type=submit]');
+  await a.waitForLoadState();
+  await until(async () => !(await b.evaluate(() => list())).some((p) => p.startsWith('MAQUINAS/')), 'MAQUINAS vacía en B');
+  await a.goto(`${BASE}/projects/1/papelera`);
+  await a.click('tr:has-text("MAQUINAS/pala.blend") button:has-text("Recuperar")');
+  await a.waitForSelector('text=Recuperado');
+  await until(async () => (await b.evaluate(() => list())).includes('MAQUINAS/pala.blend'), 'pala recuperada en B');
+  step('Borrar una carpeta con archivos los manda a la papelera y Recuperar los devuelve a B');
 
   assert.deepEqual(errors.filter((e) => !/409|423|Failed to load resource/.test(e)), []);
   console.log('\nTodo bien.');

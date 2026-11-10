@@ -129,6 +129,11 @@ func describeActivity(action, detail string, restoredFrom int64) (text, note str
 		return "creó la carpeta " + detail, ""
 	case actionDeleteFolder:
 		return "borró la carpeta " + detail, ""
+	case actionRenameFolder:
+		from, to, _ := strings.Cut(detail, " → ")
+		return "renombró la carpeta " + from + " a " + to, ""
+	case actionUndelete:
+		return "recuperó de la papelera", ""
 	case actionLock:
 		return "bloqueó", "En " + detail
 	case actionTakeover:

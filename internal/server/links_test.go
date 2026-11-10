@@ -117,7 +117,7 @@ func TestWebGuide(t *testing.T) {
 	resp, body := b.get("/guia")
 	wantPage(t, resp, body, http.StatusOK, "Qué es un archivo maestro", "Enlazar desde 3D-Vault…", `href="/guia"`, `aria-selected="true">Archivos enlazados`)
 	resp, body = b.get("/guia?tema=carpetas")
-	wantPage(t, resp, body, http.StatusOK, "Subir una carpeta entera", `aria-selected="true">Subir carpetas`)
+	wantPage(t, resp, body, http.StatusOK, "Subir una carpeta entera", "Qué hacer en cada caso", `aria-selected="true">Carpetas`)
 	resp, body = b.get("/guia?tema=problemas")
 	wantPage(t, resp, body, http.StatusOK, "Texturas rosas")
 	resp, body = b.get("/guia?tema=otro")
@@ -138,13 +138,32 @@ func TestWebFolders(t *testing.T) {
 	b.login("ana")
 	base := "/projects/" + strconv.FormatInt(project.ID, 10)
 	resp2, body := b.get(base)
-	wantPage(t, resp2, body, http.StatusOK, `data-page-delete-folder="ESCENAS/Nuevas/"`, `data-page-new-folder="ESCENAS/"`, "Vacía", `class="tree-twisty"`)
-	if strings.Contains(body, `data-page-delete-folder="ESCENAS/"`) {
-		t.Error("ESCENAS tiene archivos y aparece para borrar")
-	}
+	wantPage(t, resp2, body, http.StatusOK, `data-delete-folder="ESCENAS/Nuevas/"`, `data-rename-folder="ESCENAS/"`, `data-page-new-folder="ESCENAS/"`, "Vacía", `class="tree-twisty"`, "/papelera")
 
-	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=ESCENAS", token: e.juanToken})
+	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=ESCENAS", token: e.juanToken, clientID: "pc-1"})
 	wantStatus(t, resp, http.StatusConflict)
-	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=ESCENAS%2FNuevas", token: e.juanToken})
-	wantStatus(t, resp, http.StatusNoContent)
+	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=ESCENAS%2FNuevas", token: e.juanToken, clientID: "pc-1"})
+	wantStatus(t, resp, http.StatusOK)
+
+	// Renombrar mueve los archivos; info avisa antes.
+	resp = e.do(apiCall{method: http.MethodGet, path: "/api" + base + "/folders/info?path=ESCENAS", token: e.juanToken, clientID: "pc-1"})
+	wantStatus(t, resp, http.StatusOK)
+	if info := decode[vault.FolderInfo](t, resp); info.Files != 1 {
+		t.Errorf("info = %+v", info)
+	}
+	resp = e.do(apiCall{method: http.MethodPost, path: "/api" + base + "/folders/rename", token: e.juanToken, clientID: "pc-1", body: map[string]string{"from": "ESCENAS", "to": "Tomas"}})
+	wantStatus(t, resp, http.StatusOK)
+
+	// Borrar con archivos manda a la papelera, y desde ahí se recupera.
+	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=Tomas&files=1", token: e.juanToken, clientID: "pc-1"})
+	wantStatus(t, resp, http.StatusOK)
+	resp2, body = b.get(base + "/papelera")
+	wantPage(t, resp2, body, http.StatusOK, "Tomas/a.blend", "Recuperar")
+	snap, _ := e.svc.ListDeleted(e.ctx, project.ID)
+	resp2, body = b.post(base+"/papelera/"+strconv.FormatInt(snap[0].ID, 10)+"/recuperar", nil, nil)
+	if resp2.StatusCode != http.StatusSeeOther {
+		t.Fatalf("recuperar = %d: %s", resp2.StatusCode, body)
+	}
+	resp2, body = b.get(resp2.Header.Get("Location"))
+	wantPage(t, resp2, body, http.StatusOK, "Recuperado", "La papelera está vacía")
 }
