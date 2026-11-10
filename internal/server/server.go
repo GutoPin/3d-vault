@@ -50,6 +50,8 @@ type Config struct {
 	Now func() time.Time
 	// Backups describe las copias automáticas, para la página Espacio.
 	Backups BackupConfig
+	// Render conecta con la página de render, para «Enviar a render».
+	Render RenderConfig
 	// LowDisk decide si avisar a los admins de que queda poco disco. Por
 	// defecto, menos del 15 % o de 20 GB libres.
 	LowDisk func(free, total int64) bool
@@ -69,6 +71,8 @@ type Server struct {
 	now             func() time.Time
 	pages           *pageSet
 	backups         BackupConfig
+	renderCfg       RenderConfig
+	renderSends     renderSends
 	lowDisk         func(free, total int64) bool
 	disk            diskCache
 }
@@ -87,6 +91,7 @@ func New(cfg Config) (http.Handler, error) {
 		allowedIPs:      cfg.AllowedIPs,
 		trustedProxies:  cfg.TrustedProxies,
 		insecureCookies: cfg.InsecureCookies,
+		renderCfg:       cfg.Render,
 		heartbeat:       cfg.Heartbeat,
 		maxStreamAge:    cfg.MaxStreamAge,
 		now:             cfg.Now,

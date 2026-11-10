@@ -2,7 +2,10 @@ package server
 
 import (
 	"archive/zip"
+	"bytes"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -200,4 +203,73 @@ func TestWebDeleteProject(t *testing.T) {
 	if strings.Contains(body, "Proyectos borrados") {
 		t.Error("sigue en Proyectos borrados")
 	}
+}
+
+func TestRenderSend(t *testing.T) {
+	t.Parallel()
+	type received struct {
+		key, scene, name string
+		files            []string
+	}
+	got := make(chan received, 1)
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		zr, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+		if err != nil {
+			http.Error(w, `{"error":"zip malo"}`, http.StatusBadRequest)
+			return
+		}
+		rec := received{key: r.Header.Get("X-Puente-Clave"), scene: r.URL.Query().Get("escena"), name: r.URL.Query().Get("nombre")}
+		for _, f := range zr.File {
+			rec.files = append(rec.files, f.Name)
+		}
+		got <- rec
+		_, _ = w.Write([]byte(`{"token":"abc123"}`))
+	}))
+	t.Cleanup(fake.Close)
+
+	e := newEnv(t, func(c *Config) { c.Render = RenderConfig{URL: fake.URL, Key: "secreto"} })
+	project := e.newProject()
+	scene := e.addFile(project.ID, "escenas/escena_01.blend", blendFixture(t, "escena_01.blend"))
+	e.waitLinks(scene.Asset.ID)
+	path := "/api/assets/" + strconv.FormatInt(scene.Asset.ID, 10) + "/render"
+
+	// Sin el maestro no se envía nada.
+	resp := e.do(apiCall{method: http.MethodPost, path: path, token: e.juanToken, clientID: "pc-1"})
+	wantStatus(t, resp, http.StatusUnprocessableEntity)
+
+	master := e.addFile(project.ID, "maestros/camion_maestro.blend", blendFixture(t, "camion_maestro.blend"))
+	e.waitLinks(master.Asset.ID)
+	resp = e.do(apiCall{method: http.MethodPost, path: path, token: e.juanToken, clientID: "pc-1"})
+	wantStatus(t, resp, http.StatusAccepted)
+	id := decode[map[string]string](t, resp)["id"]
+
+	rec := <-got
+	if rec.key != "secreto" || rec.scene != "Mina Norte/escenas/escena_01.blend" {
+		t.Errorf("recibido = %+v", rec)
+	}
+	slices.Sort(rec.files)
+	if !slices.Equal(rec.files, []string{"Mina Norte/escenas/escena_01.blend", "Mina Norte/maestros/camion_maestro.blend"}) {
+		t.Errorf("zip = %v", rec.files)
+	}
+
+	var status map[string]any
+	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+		resp = e.do(apiCall{method: http.MethodGet, path: "/api/render/" + id, token: e.juanToken})
+		wantStatus(t, resp, http.StatusOK)
+		if status = decode[map[string]any](t, resp); status["state"] != "enviando" {
+			break
+		}
+	}
+	if status["state"] != "listo" || status["url"] != fake.URL+"/#renderizar/abc123" {
+		t.Errorf("estado = %v", status)
+	}
+	// Otra persona no ve el envío.
+	resp = e.do(apiCall{method: http.MethodGet, path: "/api/render/" + id, token: e.anaToken})
+	wantStatus(t, resp, http.StatusNotFound)
+
+	b := e.newBrowser()
+	b.login("ana")
+	r2, body := b.get("/assets/" + strconv.FormatInt(scene.Asset.ID, 10))
+	wantPage(t, r2, body, http.StatusOK, "data-render-send", "render-send.js")
 }

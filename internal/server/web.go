@@ -633,6 +633,8 @@ type assetData struct {
 	Requested bool
 	// Links son los archivos que usa este .blend y los .blend que usan este archivo.
 	Links vault.AssetLinks
+	// CanRender muestra «Enviar a render»: es un .blend y la página está configurada.
+	CanRender bool
 }
 
 func (s *Server) webAsset(w http.ResponseWriter, r *http.Request) {
@@ -670,6 +672,7 @@ func (s *Server) renderAsset(w http.ResponseWriter, r *http.Request, status int,
 	user, _ := currentUser(r)
 	data := assetData{
 		Links:       links,
+		CanRender:   s.renderCfg.URL != "" && strings.EqualFold(path.Ext(asset.Path), ".blend"),
 		Requested:   r.URL.Query().Get("pedido") == "1",
 		Project:     project,
 		Asset:       asset,

@@ -17,6 +17,7 @@
     {{if and $asset.Lock (ne $asset.Lock.UserID $.User.ID)}}
     <form method="post" action="/assets/{{$asset.ID}}/request-unlock"><button class="btn" type="submit" title="Le llega un aviso a {{$asset.Lock.DisplayName}}">Pedir que lo libere</button></form>
     {{end}}
+    {{if .Data.CanRender}}<button class="btn" type="button" data-render-send="{{$asset.ID}}">Enviar a render</button>{{end}}
     <a class="btn primary" href="/versions/{{$asset.HeadVersionID}}/download">Descargar v{{$asset.HeadVersion}}</a>
   </div>
 </div>
@@ -167,4 +168,5 @@
 </section>
 <script type="module" src="/static/upload.js"></script>
 {{end}}
+{{if .Data.CanRender}}<script type="module" src="/static/render-send.js"></script>{{end}}
 {{end}}

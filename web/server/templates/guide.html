@@ -112,7 +112,18 @@
   </section>
 
   <section>
-    <h2>6. Revisa en la web</h2>
+    <h2>6. Manda la escena a render</h2>
+    <p>Una escena con objetos enlazados no lleva esos objetos dentro. Por eso, para renderizarla hay que mandarla junto con ellos. 3D-Vault lo hace por ti:</p>
+    <ol class="guide-steps">
+      <li>Sube la escena y sus maestros a 3D-Vault, y abre la ficha de la escena.</li>
+      <li>Pulsa <span class="btn-like">Enviar a render</span>. Si falta un maestro, te avisa y no envía nada: súbelo y vuelve a intentarlo.</li>
+      <li>Se abre la página de render con todo cargado. Elige los frames y las máquinas, y pulsa <strong>Probar</strong> o <strong>Renderizar</strong>. No se alquila nada hasta ese momento.</li>
+    </ol>
+    <p class="guide-tip">No hace falta hacer los objetos locales ni armar copias: el render usa los mismos enlaces que tu escena.</p>
+  </section>
+
+  <section>
+    <h2>7. Revisa en la web</h2>
     <ul class="guide-steps">
       <li>En la lista del proyecto, un <code>.blend</code> con problemas lleva <span class="pill warn">1 enlace roto</span>, y la pestaña <strong>Con enlaces rotos</strong> los reúne. Un maestro lleva <span class="pill">Lo usan 3</span>.</li>
       <li>En la ficha de un <code>.blend</code>, <strong>Archivos enlazados</strong> muestra cada maestro, textura o sonido que usa y si está en 3D-Vault.</li>

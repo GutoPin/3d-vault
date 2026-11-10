@@ -93,6 +93,7 @@ func run(args []string) error {
 // config es la configuración del .env (sección 11 de PLAN.md).
 type config struct {
 	secretKey       string
+	render          server.RenderConfig
 	dataDir         string
 	listenAddr      string
 	maxFileSize     int64
@@ -146,6 +147,7 @@ func loadConfig() (config, error) {
 		return config{}, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 	cfg.insecureCookies = os.Getenv("INSECURE_COOKIES") == "true"
+	cfg.render = server.RenderConfig{URL: os.Getenv("RENDER_URL"), Key: os.Getenv("RENDER_KEY")}
 
 	cfg.backupDir, cfg.backupHour = os.Getenv("BACKUP_DIR"), 3
 	if raw := os.Getenv("BACKUP_HOUR"); raw != "" {
@@ -271,6 +273,7 @@ func serve(ctx context.Context) error {
 		AllowedIPs:      cfg.allowedIPs,
 		TrustedProxies:  cfg.trustedProxies,
 		InsecureCookies: cfg.insecureCookies,
+		Render:          cfg.render,
 		Backups: server.BackupConfig{
 			Dir:        cfg.backupDir,
 			Hour:       cfg.backupHour,
