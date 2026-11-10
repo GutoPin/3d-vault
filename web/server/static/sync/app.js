@@ -339,6 +339,8 @@ function openStream() {
   if (!ui.selected.size) return;
   const stream = new EventSource(`/api/stream?projects=${[...ui.selected].join(',')}`);
   for (const kind of [...EVENT_KINDS, 'reset']) stream.addEventListener(kind, () => syncAll());
+  // Un proyecto borrado o recuperado cambia la lista de proyectos: se vuelve a cargar.
+  for (const kind of ['project_deleted', 'project_restored']) stream.addEventListener(kind, () => location.reload());
   stream.addEventListener('unlock_requested', (e) => {
     const { payload } = JSON.parse(e.data);
     if (payload.lock?.user_id !== ui.me.id) return;

@@ -167,3 +167,37 @@ func TestWebFolders(t *testing.T) {
 	resp2, body = b.get(resp2.Header.Get("Location"))
 	wantPage(t, resp2, body, http.StatusOK, "Recuperado", "La papelera está vacía")
 }
+
+func TestWebDeleteProject(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	project := e.newProject()
+	e.newAsset(project.ID, "ESCENAS/a.blend")
+	b := e.newBrowser()
+	b.login("ana")
+	base := "/projects/" + strconv.FormatInt(project.ID, 10)
+
+	resp, body := b.get(base)
+	wantPage(t, resp, body, http.StatusOK, `popovertarget="borrar-proyecto"`, base+"/borrar")
+	resp, body = b.post(base+"/borrar", nil, nil)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("borrar = %d: %s", resp.StatusCode, body)
+	}
+	resp, body = b.get("/")
+	wantPage(t, resp, body, http.StatusOK, "Proyectos borrados", base+"/recuperar", "Ana")
+	if strings.Contains(body, `href="`+base+`"`) {
+		t.Error("el proyecto borrado sigue en el menú o en la lista")
+	}
+	resp, body = b.get(base)
+	wantPage(t, resp, body, http.StatusOK, "Este proyecto está borrado")
+
+	resp, body = b.post(base+"/recuperar", nil, nil)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("recuperar = %d: %s", resp.StatusCode, body)
+	}
+	resp, body = b.get("/")
+	wantPage(t, resp, body, http.StatusOK, `href="`+base+`"`)
+	if strings.Contains(body, "Proyectos borrados") {
+		t.Error("sigue en Proyectos borrados")
+	}
+}

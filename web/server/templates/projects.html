@@ -6,6 +6,7 @@
   </div>
 </div>
 
+{{with .Data.Restored}}<p class="notice ok" role="status">Proyecto recuperado: {{.}}.</p>{{end}}
 <div class="panel table-panel new-project-list">
   {{if .Data.Projects}}
   <div class="table-wrap">
@@ -28,6 +29,30 @@
   <p class="empty">Todavía no hay proyectos. Crea el primero aquí abajo.</p>
   {{end}}
 </div>
+
+{{if .Data.Deleted}}
+<div class="ledger-head">
+  <h2>Proyectos borrados</h2>
+  <p>No aparecen en el menú ni en Mi carpeta. Conservan todos sus archivos y versiones.</p>
+</div>
+<div class="panel table-panel">
+  <div class="table-wrap">
+    <table class="stack-table">
+      <thead><tr><th>Proyecto</th><th>Borrado por</th><th class="n">Fecha</th><th></th></tr></thead>
+      <tbody>
+      {{range .Data.Deleted}}
+        <tr>
+          <td><span class="name">{{.Name}}</span>{{if .Description}}<span class="sub">{{.Description}}</span>{{end}}</td>
+          <td data-label="Borrado por:">{{.DeletedBy}}</td>
+          <td class="n">{{with .DeletedAt}}{{when .}}{{end}}</td>
+          <td class="row-actions"><form method="post" action="/projects/{{.ID}}/recuperar"><button class="btn" type="submit">Recuperar</button></form></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
 
 <section class="settings-row">
   <div>

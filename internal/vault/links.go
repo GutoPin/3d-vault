@@ -239,7 +239,7 @@ func (s *Service) loadGraph(ctx context.Context) (*linkGraph, error) {
 		scans:    map[string]scanResult{},
 	}
 	err := s.db.ReadTx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT id, name, description, created_by, created_at, archived FROM projects`)
+		rows, err := tx.QueryContext(ctx, `SELECT id, name, description, created_by, created_at, archived, deleted_at, COALESCE((SELECT display_name FROM users WHERE id = deleted_by), '') FROM projects`)
 		if err != nil {
 			return fmt.Errorf("listar proyectos: %w", err)
 		}

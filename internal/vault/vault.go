@@ -93,6 +93,10 @@ type Project struct {
 	CreatedBy   int64     `json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	Archived    bool      `json:"archived"`
+	// DeletedAt y DeletedBy dicen cuándo y quién borró el proyecto, si está
+	// borrado (Archived).
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	DeletedBy string     `json:"deleted_by,omitempty"`
 }
 
 // Asset es un archivo con su última versión y su bloqueo.
@@ -268,8 +272,11 @@ func (s *Service) CreateProject(ctx context.Context, actor rules.Actor, name, de
 	project := Project{Name: clean, Description: strings.TrimSpace(description), CreatedBy: actor.UserID, CreatedAt: fromMillis(millis(now))}
 
 	err = s.db.WriteTx(ctx, func(tx *sql.Tx) error {
-		var exists int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM projects WHERE name_key = ?`, key).Scan(&exists)
+		var archived bool
+		err := tx.QueryRowContext(ctx, `SELECT archived FROM projects WHERE name_key = ?`, key).Scan(&archived)
+		if err == nil && archived {
+			return &rules.Error{Code: rules.CodeNameExists, Message: fmt.Sprintf("Ya hay un proyecto borrado llamado «%s». Recupéralo en Proyectos borrados, o usa otro nombre.", clean)}
+		}
 		if err == nil {
 			return &rules.Error{Code: rules.CodeNameExists, Message: fmt.Sprintf("Ya existe un proyecto llamado «%s».", clean)}
 		}
@@ -300,7 +307,7 @@ func (s *Service) ListProjects(ctx context.Context) ([]Project, error) {
 	projects := []Project{}
 	err := s.db.ReadTx(ctx, func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id, name, description, created_by, created_at, archived FROM projects ORDER BY name_key`)
+			SELECT id, name, description, created_by, created_at, archived, deleted_at, COALESCE((SELECT display_name FROM users WHERE id = deleted_by), '') FROM projects ORDER BY name_key`)
 		if err != nil {
 			return fmt.Errorf("listar proyectos: %w", err)
 		}
@@ -336,17 +343,22 @@ func scanProject(row scanner) (Project, error) {
 	var (
 		p         Project
 		createdAt int64
+		deletedAt sql.NullInt64
 	)
-	if err := row.Scan(&p.ID, &p.Name, &p.Description, &p.CreatedBy, &createdAt, &p.Archived); err != nil {
+	if err := row.Scan(&p.ID, &p.Name, &p.Description, &p.CreatedBy, &createdAt, &p.Archived, &deletedAt, &p.DeletedBy); err != nil {
 		return Project{}, err
 	}
 	p.CreatedAt = fromMillis(createdAt)
+	if deletedAt.Valid {
+		t := fromMillis(deletedAt.Int64)
+		p.DeletedAt = &t
+	}
 	return p, nil
 }
 
 func loadProject(ctx context.Context, tx *sql.Tx, id int64) (Project, error) {
 	p, err := scanProject(tx.QueryRowContext(ctx, `
-		SELECT id, name, description, created_by, created_at, archived FROM projects WHERE id = ?`, id))
+		SELECT id, name, description, created_by, created_at, archived, deleted_at, COALESCE((SELECT display_name FROM users WHERE id = deleted_by), '') FROM projects WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, notFound("El proyecto")
 	}

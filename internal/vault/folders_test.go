@@ -170,3 +170,40 @@ func TestDeleteFolderWithFilesAndUndelete(t *testing.T) {
 	}
 	_ = other
 }
+
+func TestDeleteAndRestoreProject(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	a := e.newAsset("ESCENAS/a.blend")
+	e.mustLock(e.ana, a.Asset.ID)
+
+	wantRule(t, e.svc.DeleteProject(e.ctx, e.juan, e.project.ID), rules.CodeLocked)
+	// Quien tiene el bloqueo sí puede.
+	if err := e.svc.DeleteProject(e.ctx, e.ana, e.project.ID); err != nil {
+		t.Fatal(err)
+	}
+	p, err := e.svc.GetProject(e.ctx, e.project.ID)
+	if err != nil || !p.Archived || p.DeletedAt == nil || p.DeletedBy != "Ana" {
+		t.Fatalf("proyecto borrado = %+v, %v", p, err)
+	}
+	// Sin cambios mientras está borrado, y su nombre sigue ocupado.
+	_, err = e.commit(e.ana, a.Asset.ID, 1)
+	wantRule(t, err, rules.CodeProjectArchived)
+	if _, err := e.svc.CreateProject(e.ctx, e.juan, "mina norte", ""); err == nil {
+		t.Error("se creó otro proyecto con el nombre de uno borrado")
+	}
+
+	if err := e.svc.RestoreProject(e.ctx, e.juan, e.project.ID); err != nil {
+		t.Fatal(err)
+	}
+	p, _ = e.svc.GetProject(e.ctx, e.project.ID)
+	if p.Archived || p.DeletedAt != nil {
+		t.Errorf("proyecto recuperado = %+v", p)
+	}
+	if got := e.mustHead(a.Asset.ID); got.Lock == nil || got.HeadVersion != 1 {
+		t.Errorf("el archivo no volvió igual: %+v", got)
+	}
+	if e.activityCount(actionDeleteProject) != 1 || e.activityCount(actionRestoreProject) != 1 {
+		t.Error("faltan acciones en la actividad")
+	}
+}

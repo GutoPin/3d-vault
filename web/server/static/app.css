@@ -521,3 +521,8 @@ ul.guide-steps { list-style: disc; }
 .folder-dialog { width: min(560px, calc(100vw - 32px)); }
 .folder-info { display: grid; gap: 8px; }
 .folder-info .notice { margin: 0; }
+.confirm-pop { width: min(520px, calc(100vw - 32px)); margin: auto; padding: var(--card-pad); border: 1px solid var(--border); gap: 10px; }
+.confirm-pop:popover-open { display: grid; }
+.confirm-pop::backdrop { background: rgb(10 10 10 / 0.35); }
+.confirm-pop h2 { font-size: var(--fs-section); font-weight: 600; }
+.deleted-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

@@ -9,9 +9,28 @@
     <button class="btn" type="button" data-page-new-folder="">Nueva carpeta</button>
     <a class="btn" href="/activity?project={{.Data.Project.ID}}">Actividad</a>
     <a class="btn" href="/projects/{{.Data.Project.ID}}/papelera">Papelera</a>
+    {{if not .Data.Project.Archived}}<button class="btn" type="button" popovertarget="borrar-proyecto">Borrar proyecto</button>{{end}}
     {{if .Data.HasFiles}}<a class="btn" href="/projects/{{.Data.Project.ID}}/download.zip" title="La última versión de cada archivo, con sus carpetas">Descargar todo (.zip)</a>{{end}}
   </div>
 </div>
+
+{{if .Data.Project.Archived}}
+<div class="notice warn deleted-banner" role="status">
+  <span>Este proyecto está borrado{{with .Data.Project.DeletedBy}} por {{.}}{{end}}{{with .Data.Project.DeletedAt}}, {{when .}}{{end}}. Puedes ver y descargar sus archivos, pero no cambiarlos.</span>
+  <form method="post" action="/projects/{{.Data.Project.ID}}/recuperar"><button class="btn" type="submit">Recuperar proyecto</button></form>
+</div>
+{{else}}
+<div class="panel confirm-pop" id="borrar-proyecto" popover>
+  <h2>¿Borrar «{{.Data.Project.Name}}»?</h2>
+  <p>{{.Data.Summary}}</p>
+  <p>Desaparece del menú y de Mi carpeta en cada PC, y nadie podrá cambiar sus archivos. Las copias que ya están en las PCs no se tocan.</p>
+  <p>No se pierde nada: se puede recuperar en <strong>Todos los proyectos → Proyectos borrados</strong>.</p>
+  <form class="form-foot" method="post" action="/projects/{{.Data.Project.ID}}/borrar">
+    <button class="btn ghost" type="button" popovertarget="borrar-proyecto" popovertargetaction="hide">Cancelar</button>
+    <button class="btn danger" type="submit">Borrar proyecto</button>
+  </form>
+</div>
+{{end}}
 
 <div id="asset-list">
   <nav class="tabs" aria-label="Filtrar archivos">

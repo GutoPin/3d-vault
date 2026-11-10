@@ -120,7 +120,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, name
 			s.webFail(w, r, err)
 			return
 		}
-		page.Projects = projects
+		// Los borrados no van en el menú: están en Todos los proyectos.
+		for _, p := range projects {
+			if !p.Archived {
+				page.Projects = append(page.Projects, p)
+			}
+		}
 		if user.IsAdmin {
 			page.DiskAlert = s.diskAlert()
 		}
@@ -209,6 +214,8 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Get("/projects/{id}", s.webProject)
 		r.Get("/projects/{id}/download.zip", s.webProjectZip)
 		r.Get("/projects/{id}/papelera", s.webTrash)
+		r.Post("/projects/{id}/borrar", s.webDeleteProject)
+		r.Post("/projects/{id}/recuperar", s.webRestoreProject)
 		r.Post("/projects/{id}/papelera/{asset}/recuperar", s.webUndelete)
 		r.Get("/assets/{id}/with-links.zip", s.webLinkedZip)
 		r.Get("/assets/{id}", s.webAsset)
@@ -327,6 +334,8 @@ func (s *Server) webLogout(w http.ResponseWriter, r *http.Request) {
 type projectsData struct {
 	Summary         string
 	Projects        []vault.ProjectSummary
+	Deleted         []vault.Project
+	Restored        string
 	FormName        string
 	FormDescription string
 }
@@ -341,7 +350,24 @@ func (s *Server) renderProjects(w http.ResponseWriter, r *http.Request, status i
 		s.webFail(w, r, err)
 		return
 	}
-	data.Projects = summaries
+	all, err := s.svc.ListProjects(r.Context())
+	if err != nil {
+		s.webFail(w, r, err)
+		return
+	}
+	for _, p := range all {
+		if p.Archived {
+			data.Deleted = append(data.Deleted, p)
+		}
+	}
+	data.Projects = nil
+	for _, p := range summaries {
+		if !p.Archived {
+			data.Projects = append(data.Projects, p)
+		}
+	}
+	summaries = data.Projects
+	data.Restored = r.URL.Query().Get("recuperado")
 
 	var files, locked int
 	var total int64

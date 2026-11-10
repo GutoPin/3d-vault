@@ -134,6 +134,10 @@ func describeActivity(action, detail string, restoredFrom int64) (text, note str
 		return "renombró la carpeta " + from + " a " + to, ""
 	case actionUndelete:
 		return "recuperó de la papelera", ""
+	case actionDeleteProject:
+		return "borró el proyecto", ""
+	case actionRestoreProject:
+		return "recuperó el proyecto", ""
 	case actionLock:
 		return "bloqueó", "En " + detail
 	case actionTakeover:
