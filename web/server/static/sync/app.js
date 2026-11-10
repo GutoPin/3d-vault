@@ -12,7 +12,7 @@ const STATUS = {
   locked: 'Bloqueado por ti',
   changed: 'Cambios sin subir',
   new: 'Nuevo, sin subir',
-  missing: 'No está en tu carpeta',
+  missing: 'Borrado en tu PC: falta confirmar',
   moved: 'Renombrado o movido',
   error: 'Error',
 };
@@ -166,8 +166,8 @@ function rowActions(pid, row) {
   if (row.status === 'new') out.push(actionButton('Agregar…', 'upload', pid, row.key, true));
   if (row.status === 'changed') out.push(actionButton('Subir…', 'upload', pid, row.key, true));
   if (row.status === 'missing') {
-    out.push(actionButton('Descargar', 'restore', pid, row.key));
-    out.push(actionButton('Borrar del servidor', 'delete', pid, row.key));
+    out.push(actionButton('Confirmar borrado', 'delete', pid, row.key, true));
+    out.push(actionButton('Recuperar en mi PC', 'restore', pid, row.key));
   }
   if (a && row.status !== 'missing') {
     if (row.lockedByMe) out.push(actionButton('Liberar', 'unlock', pid, row.key));
@@ -200,18 +200,52 @@ function statusCell(row) {
   return el('td', { class: row.status === 'error' ? 'sync-error' : '' }, text, owner && el('span', { class: 'sub' }, owner));
 }
 
+// pendingCounts cuenta lo que hay en la PC y no en 3D-Vault: lo que se sube o
+// se borra con «Subir cambios».
+function pendingCounts(rows) {
+  const c = { nuevos: 0, cambiados: 0, borrados: 0 };
+  for (const r of rows) {
+    if (r.status === 'new') c.nuevos++;
+    else if (r.status === 'changed') c.cambiados++;
+    else if (r.status === 'missing') c.borrados++;
+  }
+  c.total = c.nuevos + c.cambiados + c.borrados;
+  return c;
+}
+
+function describeCounts(c) {
+  return [
+    c.nuevos && `${c.nuevos} ${c.nuevos === 1 ? 'nuevo' : 'nuevos'}`,
+    c.cambiados && `${c.cambiados} ${c.cambiados === 1 ? 'modificado' : 'modificados'}`,
+    c.borrados && `${c.borrados} ${c.borrados === 1 ? 'borrado' : 'borrados'}`,
+  ].filter(Boolean).join(', ');
+}
+
+// publishPending deja en este navegador un resumen de los cambios sin subir,
+// para que el menú y la página del proyecto lo avisen en otras pestañas.
+function publishPending(summary) {
+  try {
+    localStorage.setItem('3dvault-pendientes', JSON.stringify({ at: Date.now(), projects: summary }));
+  } catch {
+    // Sin almacenamiento, el aviso solo se ve en esta página.
+  }
+}
+
 function render() {
   const box = $('project-tables');
   box.textContent = '';
   let pending = 0;
+  const summary = {};
   for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
     const engine = ui.engines.get(p.id);
     const all = engine?.rows ?? [];
     const query = $('filter').value.trim().toLowerCase();
     const onlyPending = $('only-pending').checked;
     const rows = all.filter((r) => (!query || r.key.includes(query)) && (!onlyPending || NEEDS_ME.has(r.status)));
-    const toUpload = all.filter((r) => r.status === 'changed' || r.status === 'new').length;
+    const counts = pendingCounts(all);
+    const toUpload = counts.total;
     pending += toUpload + all.filter((r) => r.status === 'error' || r.status === 'moved').length;
+    if (toUpload) summary[p.id] = { name: p.name, ...counts };
     const body = rows.map((row) => el('tr', {},
       el('td', {}, row.asset ? el('a', { class: 'name', href: `/assets/${row.asset.id}` }, row.asset.path) : el('span', { class: 'name' }, row.local.path)),
       el('td', { class: 'n' }, row.asset ? `v${row.asset.head_version}` : '—'),
@@ -221,7 +255,7 @@ function render() {
     ));
     box.append(
       el('div', { class: 'ledger-head' }, el('h2', {}, p.name),
-        el('p', {}, `Carpeta: ${safeName(p.name)}`, toUpload > 1 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id }, `Subir todo (${toUpload})`))),
+        el('p', {}, `Carpeta: ${safeName(p.name)}`, toUpload > 0 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id }, `Subir cambios (${toUpload})`))),
       el('div', { class: 'panel table-panel drop-zone', 'data-drop': p.id }, rows.length
         ? el('div', { class: 'table-wrap' }, el('table', { class: 'stack-table' },
             el('thead', {}, el('tr', {}, el('th', {}, 'Archivo'), el('th', { class: 'n' }, 'Versión'), el('th', { class: 'n' }, 'Tamaño'), el('th', {}, 'Estado'), el('th', {}, ''))),
@@ -236,6 +270,18 @@ function render() {
   const state = ui.paused ? 'Sincronización en pausa.' : ui.running ? 'Sincronizando…' : 'Sincronización automática activa.';
   $('sync-summary').textContent = pending ? `${state} ${pending} archivo(s) esperan que hagas algo.` : state;
   document.title = `${pending ? `(${pending}) ` : ''}Mi carpeta · 3D-Vault`;
+  publishPending(summary);
+
+  // Aviso arriba: lo que cambió en esta PC y falta llevar a 3D-Vault.
+  const banner = $('pending-banner');
+  const entries = Object.entries(summary);
+  banner.hidden = !entries.length;
+  banner.replaceChildren(...(entries.length ? [
+    el('strong', {}, 'Tienes cambios en esta PC que aún no están en 3D-Vault.'),
+    ' Los demás no los ven hasta que los subas. Los borrados también hay que confirmarlos, para que nadie pierda un archivo por error.',
+    el('ul', { class: 'upload-plan' }, ...entries.map(([id, c]) => el('li', {}, `${c.name}: ${describeCounts(c)} `,
+      el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': id }, 'Subir cambios…')))),
+  ] : []));
 
   // Bloqueos propios de más de un día: un olvido frecuente que frena a los demás.
   const old = [...ui.engines.values()].flatMap((e) => e.rows)
@@ -384,15 +430,30 @@ const askUpload = (row) => askComment(row.asset ? `Subir ${row.asset.path}` : `A
 
 // uploadMany sube varios archivos con el mismo comentario, uno tras otro.
 async function uploadMany(engine, keys, title) {
-  const rows = () => engine.rows.filter((r) => keys.has(r.key) && (r.status === 'changed' || r.status === 'new'));
+  const rows = () => engine.rows.filter((r) => keys.has(r.key) && (r.status === 'changed' || r.status === 'new' || r.status === 'missing'));
   const list = rows();
   if (!list.length) return;
-  const allNew = list.every((r) => r.status === 'new');
-  const answer = await askComment(`${title} (${list.length})`, allNew ? 'Primera versión' : '', list.some((r) => r.lockedByMe));
+  const uploads = list.filter((r) => r.status !== 'missing');
+  const deletes = list.filter((r) => r.status === 'missing');
+  const allNew = uploads.length && uploads.every((r) => r.status === 'new');
+  const plan = el('ul', { class: 'upload-plan' },
+    uploads.length ? el('li', {}, `Se suben: ${uploads.map((r) => r.asset?.path ?? r.local.path).join(', ')}`) : null,
+    deletes.length ? el('li', {}, `Se borran en 3D-Vault, porque los borraste en esta PC: ${deletes.map((r) => r.asset.path).join(', ')}. Quedan en la Papelera del proyecto.`) : null);
+  $('upload-plan').replaceChildren(plan);
+  const answer = await askComment(`${title} (${list.length})`, allNew ? 'Primera versión' : uploads.length ? '' : 'Borro archivos que ya no se usan', uploads.some((r) => r.lockedByMe));
+  $('upload-plan').replaceChildren();
   if (!answer) return;
   await run(async () => {
     const failed = [];
-    for (const row of list) {
+    for (const row of deletes) {
+      try {
+        await engine.deleteOnServer(row);
+        log(`${row.asset.path}: borrado en 3D-Vault (está en la Papelera).`);
+      } catch (err) {
+        failed.push(`${row.asset.path}: ${err.message}`);
+      }
+    }
+    for (const row of uploads) {
       try {
         const r = await engine.upload(row, answer.comment, answer.release && row.lockedByMe);
         log(`${row.asset?.path ?? row.local.path}: ${r.noChanges ? 'sin cambios' : `subido como v${r.version}`}.`);
@@ -400,8 +461,8 @@ async function uploadMany(engine, keys, title) {
         failed.push(`${row.local.path}: ${err.message}`);
       }
     }
-    if (failed.length) notice(`No se pudieron subir ${failed.length}: ${failed.join(' · ')}`);
-    else notice(`Listo: ${list.length} archivo(s) subidos.`, true);
+    if (failed.length) notice(`No se pudieron completar ${failed.length}: ${failed.join(' · ')}`);
+    else notice(`Listo: ${[uploads.length && `${uploads.length} subido(s)`, deletes.length && `${deletes.length} borrado(s)`].filter(Boolean).join(' y ')}.`, true);
   });
 }
 
@@ -442,7 +503,7 @@ const actions = {
       log(`${row.asset?.path ?? row.local.path}: ${msg}`);
     });
   },
-  'upload-all': (engine) => uploadMany(engine, new Set(engine.rows.map((r) => r.key)), 'Subir todo'),
+  'upload-all': (engine) => uploadMany(engine, new Set(engine.rows.map((r) => r.key)), 'Subir cambios'),
   install: async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -480,7 +541,7 @@ const actions = {
   }),
   restore: (engine, row) => run(() => engine.restoreMissing(row)),
   delete: (engine, row) => run(async () => {
-    if (!confirm(`¿Borrar ${row.asset.path} del servidor? Desaparecerá de las PCs de todos. El administrador puede recuperarlo hasta la próxima limpieza.`)) return;
+    if (!confirm(`¿Borrar ${row.asset.path} también en 3D-Vault? Desaparecerá de las PCs de todos. Queda en la Papelera del proyecto, desde donde se puede recuperar.`)) return;
     await engine.deleteOnServer(row);
     log(`${row.asset.path} se borró del servidor.`);
   }),
@@ -619,6 +680,28 @@ async function pickFolder() {
   }
 }
 
+// watchFolder revisa la carpeta en cuanto cambia algo en el disco (borrar,
+// agregar o guardar), en los navegadores que tienen FileSystemObserver (Chrome
+// y Edge recientes). En los demás, se revisa al volver a la pestaña y cada
+// minuto. Lo que escribe la propia sincronización también avisa, pero esa
+// pasada extra no encuentra nada que hacer.
+let watcher = null;
+let watchTimer = null;
+async function watchFolder() {
+  watcher?.disconnect();
+  watcher = null;
+  if (!('FileSystemObserver' in window) || !ui.root) return;
+  try {
+    watcher = new FileSystemObserver(() => {
+      clearTimeout(watchTimer);
+      watchTimer = setTimeout(() => syncAll(), 1500);
+    });
+    await watcher.observe(ui.root, { recursive: true });
+  } catch {
+    watcher = null; // sin permiso o sin soporte para esta carpeta
+  }
+}
+
 function startMain() {
   $('root-name').textContent = ui.root.name;
   renderComforts();
@@ -627,6 +710,7 @@ function startMain() {
   render();
   openStream();
   syncAll();
+  watchFolder();
 }
 
 async function main() {

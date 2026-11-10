@@ -11,6 +11,7 @@
 </div>
 
 <p class="notice" id="sync-notice" role="status" hidden></p>
+<div class="notice warn pending-banner" id="pending-banner" role="status" hidden></div>
 <p class="notice warn" id="stale-locks" hidden></p>
 
 <section class="panel" id="sync-unsupported" hidden>
@@ -127,6 +128,7 @@
       <label for="upload-comment">¿Qué cambió?</label>
       <textarea class="input" id="upload-comment" rows="3" minlength="3" maxlength="500" required></textarea>
     </div>
+    <div class="wide" id="upload-plan"></div>
     <label class="check wide" id="upload-release-row"><input type="checkbox" id="upload-release" checked> Liberar el bloqueo al terminar</label>
     <div class="wide form-foot">
       <button class="btn ghost" type="button" data-action="cancel-upload">Cancelar</button>

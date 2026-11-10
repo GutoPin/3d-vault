@@ -300,3 +300,51 @@ setInterval(() => refresh(REFRESH_MS - 1000), REFRESH_MS);
 // La página del proyecto también puede crear y borrar carpetas.
 document.addEventListener('3dvault:folders', (e) => trees.get(String(e.detail.project))?.load());
 export { trees };
+
+// Cambios sin subir: Mi carpeta deja un resumen en este navegador. Aquí se
+// avisa en el menú y en la página del proyecto, para que un borrado o un archivo
+// nuevo en la PC no pase desapercibido. Si Mi carpeta no corre hace rato, el
+// resumen ya no vale y no se muestra.
+const PENDING_MAX_AGE = 30 * 60 * 1000;
+
+function readPending() {
+  try {
+    const data = JSON.parse(localStorage.getItem('3dvault-pendientes'));
+    if (!data || Date.now() - data.at > PENDING_MAX_AGE) return {};
+    return data.projects || {};
+  } catch {
+    return {};
+  }
+}
+
+function describe(c) {
+  return [
+    c.nuevos && `${c.nuevos} ${c.nuevos === 1 ? 'archivo nuevo' : 'archivos nuevos'}`,
+    c.cambiados && `${c.cambiados} ${c.cambiados === 1 ? 'modificado' : 'modificados'}`,
+    c.borrados && `${c.borrados} ${c.borrados === 1 ? 'borrado' : 'borrados'}`,
+  ].filter(Boolean).join(', ');
+}
+
+function showPending() {
+  if (location.pathname === '/sync') return; // Mi carpeta tiene su propio aviso
+  const pending = readPending();
+  const total = Object.values(pending).reduce((s, c) => s + c.total, 0);
+  const nav = document.querySelector('.sidebar a.nav-item[href="/sync"]');
+  if (nav) {
+    nav.querySelector('.nav-count')?.remove();
+    if (total) nav.append(el('span', { class: 'nav-count pending-count', title: 'Cambios en tu PC sin subir a 3D-Vault' }, String(total)));
+  }
+  document.getElementById('pending-here')?.remove();
+  const project = document.querySelector('.nav-project[data-active]')?.dataset.project;
+  const here = project && pending[project];
+  const main = document.querySelector('main.canvas');
+  if (here && main) {
+    main.prepend(el('p', { class: 'notice warn', id: 'pending-here', role: 'status' },
+      `En tu PC hay cambios de este proyecto que aún no están en 3D-Vault: ${describe(here)}. Los demás no los ven hasta que los subas. `,
+      el('a', { href: '/sync' }, 'Ir a Mi carpeta y pulsar Subir cambios')));
+  }
+}
+showPending();
+addEventListener('storage', (e) => {
+  if (e.key === '3dvault-pendientes') showPending();
+});

@@ -43,7 +43,7 @@ En la tabla de cada proyecto ves el estado de cada archivo:
 | Bloqueado por Juan | Lo está editando Juan | Ábrelo para mirar, pero no lo edites. Si lo necesitas, **Pedir que lo libere**: a Juan le llega un aviso |
 | Cambios sin subir | Lo guardaste y el servidor aún no lo tiene | **Subir…** |
 | Nuevo, sin subir | Es un archivo que solo está en tu PC | **Agregar…** si es del proyecto |
-| No está en tu carpeta | Lo borraste o lo moviste | **Descargar** para recuperarlo |
+| Borrado en tu PC: falta confirmar | Lo borraste o lo moviste en tu PC | **Subir cambios** (o **Confirmar borrado**) para borrarlo también en 3D-Vault, o **Recuperar en mi PC** |
 | Renombrado o movido | Le cambiaste el nombre o la carpeta en el Explorador | **Mover en el servidor**: conserva su historial y llega así a todos |
 
 ## Editar un archivo, paso a paso
@@ -126,7 +126,7 @@ También puedes copiar o guardar el archivo dentro de la carpeta del proyecto. E
 - **Carpetas vacías:** en el menú de la izquierda, la flecha junto al proyecto despliega sus carpetas y archivos. El ícono de carpeta con + crea una carpeta nueva, y la papelera borra una vacía. Mi carpeta las crea o borra también en tu PC, y al revés: una carpeta que crees en el Explorador aparece en la web. Una carpeta con archivos nunca se borra sola.
 - Antes de subir te muestra qué es nuevo, qué ya existía (recibe una versión nueva si cambió) y qué está bloqueado por otra persona (no se toca).
 
-Si tienes varios archivos nuevos o cambiados, el botón **Subir todo** junto al nombre del proyecto los sube de una vez con el mismo comentario.
+Cuando hay cambios en tu PC que no están en 3D-Vault (archivos nuevos, modificados o borrados, de cualquier tipo: `.blend`, `.fbx`, `.obj`, imágenes…), Mi carpeta lo avisa arriba y el botón **Subir cambios** los sube o los borra de una vez, con un solo comentario, como un commit. El menú de la izquierda también muestra un número junto a **Mi carpeta**, y la página del proyecto avisa.
 
 En proyectos grandes, el buscador de arriba filtra por nombre y **Solo lo que necesita algo de mí** deja solo lo pendiente.
 
@@ -171,6 +171,6 @@ Pulsa el nombre de un archivo para abrir su ficha. Ahí ves la miniatura de los 
 
 **Borré un archivo sin querer.** Pulsa **Descargar** en su fila. Borrar en tu PC nunca lo borra del servidor.
 
-**Quiero borrarlo de verdad.** Borra el archivo de tu carpeta y luego pulsa **Borrar del servidor**. Desaparece para todos, pero el administrador puede recuperarlo durante un tiempo.
+**Quiero borrarlo de verdad.** Borra el archivo de tu carpeta y pulsa **Subir cambios** (o **Confirmar borrado** en su fila). Desaparece para todos y queda en la **Papelera** del proyecto, desde donde se recupera.
 
 **¿Funciona en Mac?** Sí, con Google Chrome.

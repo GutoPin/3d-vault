@@ -73,15 +73,15 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 |---|---|
 | PC B: renombrar en el Explorador `rueda.stl` → `rueda_trasera.stl` | **Renombrado o movido**, con "Antes: exportados/rueda.stl" |
 | **Mover en el servidor** | La ficha conserva el historial. En PC A, `rueda.stl` desaparece y aparece `rueda_trasera.stl` |
-| PC B: borrar `render\camion_render.png` | **No está en tu carpeta**. En el servidor y en PC A sigue estando |
+| PC B: borrar `render\camion_render.png` | En segundos: **Borrado en tu PC: falta confirmar**, aviso arriba y número junto a Mi carpeta en el menú. En el servidor y en PC A sigue estando |
 | **Descargar** | Vuelve a la carpeta |
-| **Borrar del servidor**, en otro archivo que borraste | Pide confirmación. Desaparece para todos y las carpetas lo quitan si no tenía cambios |
+| **Subir cambios** | El diálogo dice qué se borra. Desaparece para todos, las carpetas lo quitan si no tenía cambios y queda en la Papelera |
 
 ## 6. Facilidades
 
 | Prueba | Debe pasar |
 |---|---|
-| Copiar a la carpeta 2 o 3 archivos nuevos y pulsar **Subir todo (N)** | Un solo comentario para todos |
+| Copiar a la carpeta 2 o 3 archivos nuevos y pulsar **Subir cambios (N)** | Un solo comentario para todos |
 | **Pausar** y copiar un archivo nuevo | No cambia nada hasta **Reanudar** |
 | Escribir en el buscador o marcar **Solo lo que necesita algo de mí** | La tabla se filtra |
 | Cerrar la pestaña y volver a abrir `/sync` | Pide **Permitir y sincronizar**. Al aceptar, el estado sigue igual y no se vuelve a bajar nada |

@@ -215,9 +215,29 @@ try {
   await a.click('button[data-action=upload-all]');
   await a.fill('#upload-comment', 'Agrego pala y textura');
   await a.click('#upload-dialog button[value=ok]');
-  await a.waitForFunction(() => /Listo: 2 archivo/.test(document.getElementById('sync-notice').textContent), null, { timeout: 30000 });
+  await a.waitForFunction(() => /Listo: 2 subido/.test(document.getElementById('sync-notice').textContent), null, { timeout: 30000 });
   await b.waitForFunction(() => window.row('texturas/chapa.png')?.status === 'ok' && window.row('modelos/pala.blend')?.status === 'ok', null, { timeout: 60000 });
   step('Subir todo agrega dos archivos con un comentario y B los recibe');
+
+  // Un borrado en B queda pendiente, con aviso arriba, hasta confirmarlo con
+  // Subir cambios. Entonces se borra en 3D-Vault y en A, y va a la papelera.
+  await b.evaluate(async () => { const { d, name } = await dir('texturas/chapa.png'); await d.removeEntry(name); });
+  await b.click('[data-action=sync-now]');
+  await waitRow(b, 'texturas/chapa.png', 'missing');
+  await b.waitForSelector('#pending-banner:not([hidden]) >> text=1 borrado');
+  assert.ok(await b.evaluate(() => JSON.parse(localStorage.getItem('3dvault-pendientes')).projects[1].borrados === 1));
+  const tab = await b.context().newPage();
+  await tab.goto(`${BASE}/projects/1`);
+  await tab.waitForSelector('#pending-here >> text=1 borrado');
+  assert.equal(await tab.textContent('a.nav-item[href="/sync"] .pending-count'), '1');
+  await tab.close();
+  await b.click('#pending-banner button[data-action=upload-all]');
+  await b.waitForSelector('#upload-plan >> text=Se borran en 3D-Vault');
+  await b.click('#upload-dialog button[value=ok]');
+  await b.waitForFunction(() => /Listo: 1 borrado/.test(document.getElementById('sync-notice').textContent), null, { timeout: 30000 });
+  await until(async () => !(await a.evaluate(() => list())).includes('texturas/chapa.png'), 'chapa.png quitada en A');
+  assert.ok(await b.isHidden('#pending-banner'));
+  step('Un borrado en la PC queda pendiente con aviso y Subir cambios lo confirma en 3D-Vault y en A');
 
   await a.fill('#filter', 'PALA');
   await a.waitForFunction(() => [...document.querySelectorAll('#project-tables tbody tr')].length === 1, null, { timeout: 5000 });
