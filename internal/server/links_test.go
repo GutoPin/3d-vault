@@ -123,3 +123,28 @@ func TestWebGuide(t *testing.T) {
 	resp, body = b.get("/guia?tema=otro")
 	wantPage(t, resp, body, http.StatusOK, "Qué es un archivo maestro")
 }
+
+func TestWebFolders(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	project := e.newProject()
+	e.newAsset(project.ID, "ESCENAS/a.blend")
+	resp := e.do(apiCall{method: http.MethodPost, path: "/api/projects/" + strconv.FormatInt(project.ID, 10) + "/folders", token: e.juanToken, body: map[string]string{"path": "ESCENAS/Nuevas"}})
+	wantStatus(t, resp, http.StatusCreated)
+	resp = e.do(apiCall{method: http.MethodPost, path: "/api/projects/" + strconv.FormatInt(project.ID, 10) + "/folders", token: e.juanToken, body: map[string]string{"path": "escenas/nuevas"}})
+	wantStatus(t, resp, http.StatusOK)
+
+	b := e.newBrowser()
+	b.login("ana")
+	base := "/projects/" + strconv.FormatInt(project.ID, 10)
+	resp2, body := b.get(base)
+	wantPage(t, resp2, body, http.StatusOK, `data-page-delete-folder="ESCENAS/Nuevas/"`, `data-page-new-folder="ESCENAS/"`, "Vacía", `class="tree-twisty"`)
+	if strings.Contains(body, `data-page-delete-folder="ESCENAS/"`) {
+		t.Error("ESCENAS tiene archivos y aparece para borrar")
+	}
+
+	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=ESCENAS", token: e.juanToken})
+	wantStatus(t, resp, http.StatusConflict)
+	resp = e.do(apiCall{method: http.MethodDelete, path: "/api" + base + "/folders?path=ESCENAS%2FNuevas", token: e.juanToken})
+	wantStatus(t, resp, http.StatusNoContent)
+}

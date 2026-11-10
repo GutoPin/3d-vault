@@ -6,6 +6,7 @@
     <p class="sub">{{.Data.Summary}}</p>
   </div>
   <div class="actions">
+    <button class="btn" type="button" data-page-new-folder="">Nueva carpeta</button>
     <a class="btn" href="/activity?project={{.Data.Project.ID}}">Actividad</a>
     {{if .Data.HasFiles}}<a class="btn" href="/projects/{{.Data.Project.ID}}/download.zip" title="La última versión de cada archivo, con sus carpetas">Descargar todo (.zip)</a>{{end}}
   </div>
@@ -33,7 +34,7 @@
           <tbody>
           {{range .Data.Rows}}
             {{if .Folder}}
-            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> <a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a> <button class="text-action folder-zip" type="button" data-upload-here="{{.Prefix}}" aria-label="Agregar archivos a la carpeta {{.Name}}">Agregar aquí</button></span></td></tr>
+            <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> {{if not .Empty}}<a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a>{{end}} <button class="text-action folder-zip" type="button" data-upload-here="{{.Prefix}}" aria-label="Agregar archivos a la carpeta {{.Name}}">Agregar aquí</button> <button class="text-action folder-zip" type="button" data-page-new-folder="{{.Prefix}}" aria-label="Nueva carpeta dentro de {{.Name}}">Nueva carpeta</button>{{if .Empty}} <button class="text-action folder-zip" type="button" data-page-delete-folder="{{.Prefix}}" aria-label="Borrar la carpeta vacía {{.Name}}">Borrar</button> <span class="pill">Vacía</span>{{end}}</span></td></tr>
             {{else}}
             <tr>
               <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a>{{with .Links}}{{if .Broken}}<span class="pill warn link-mark" title="Usa archivos que en otras PCs no se encontrarán">{{plural .Broken "enlace roto" "enlaces rotos"}}</span>{{end}}{{if .UsedBy}}<span class="pill link-mark" title="Otros .blend enlazan este archivo">Lo usan {{.UsedBy}}</span>{{end}}{{end}}</span></td>
@@ -75,7 +76,23 @@
     <div class="wide form-foot upload-foot"><span class="sub" data-status role="status"></span><button class="btn primary" type="submit">Agregar</button></div>
   </form>
 </section>
+<dialog class="panel" id="folder-dialog">
+  <form method="dialog" class="form-grid">
+    <h2 class="wide">Nueva carpeta</h2>
+    <div class="field wide">
+      <label for="folder-name">Nombre</label>
+      <input class="input" id="folder-name" maxlength="500" autocomplete="off" required>
+      <span class="hint" id="folder-where">En la raíz del proyecto. Puedes escribir varias, por ejemplo <code>ASSETS/Vehículos</code>.</span>
+    </div>
+    <p class="sync-error wide" id="folder-error" role="alert" hidden></p>
+    <div class="wide form-foot">
+      <button class="btn ghost" type="button" value="cancel" data-close>Cancelar</button>
+      <button class="btn primary" type="submit" value="ok">Crear</button>
+    </div>
+  </form>
+</dialog>
 <script type="module" src="/static/upload.js"></script>
+<script type="module" src="/static/folders.js"></script>
 {{end}}
 
 {{define "lock-mark"}}{{if .}}<span class="lock-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{.DisplayName}}</span>{{else}}<span class="free">Libre</span>{{end}}{{end}}

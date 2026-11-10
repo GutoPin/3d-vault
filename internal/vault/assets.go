@@ -285,6 +285,9 @@ func (s *Service) CreateAsset(ctx context.Context, actor rules.Actor, in CreateA
 		if err != nil || done {
 			return err
 		}
+		if err := checkFolderFree(ctx, tx, in.ProjectID, path); err != nil {
+			return err
+		}
 
 		res, err := tx.ExecContext(ctx, `
 			INSERT INTO assets(project_id, path, path_key, ext, head_version, created_by, created_at)
@@ -563,6 +566,9 @@ func (s *Service) Move(ctx context.Context, actor rules.Actor, assetID, base int
 			if !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("consultar ruta: %w", err)
 			}
+		}
+		if err := checkFolderFree(ctx, tx, asset.ProjectID, path); err != nil {
+			return err
 		}
 
 		if _, err := tx.ExecContext(ctx, `UPDATE assets SET path = ?, path_key = ?, ext = ? WHERE id = ?`,

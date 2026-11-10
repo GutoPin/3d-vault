@@ -49,6 +49,8 @@ func (s *Server) apiRoutes(r chi.Router) {
 			r.Get("/projects", s.apiListProjects)
 			r.Post("/projects", s.apiCreateProject)
 			r.Get("/projects/{id}/snapshot", s.apiSnapshot)
+			r.Post("/projects/{id}/folders", s.apiCreateFolder)
+			r.Delete("/projects/{id}/folders", s.apiDeleteFolder)
 			r.Get("/projects/{id}/events", s.apiEvents)
 			r.Get("/stream", s.apiStream)
 

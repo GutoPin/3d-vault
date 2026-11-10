@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 const AUTO_EVERY = 60_000;
 const STALE_LOCK = 24 * 3600_000;
 const NEEDS_ME = new Set(['changed', 'new', 'moved', 'missing', 'error']);
-const EVENT_KINDS = ['asset_created', 'version_created', 'locked', 'unlocked', 'moved', 'deleted'];
+const EVENT_KINDS = ['asset_created', 'version_created', 'locked', 'unlocked', 'moved', 'deleted', 'folder_created', 'folder_deleted'];
 
 const STATUS = {
   ok: 'Al día',

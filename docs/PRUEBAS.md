@@ -123,6 +123,10 @@ Comparación opcional con Comprimir: agrega `para-versiones\camion_comprimido.bl
 | **Descargar con todo lo que usa (.zip)** y abrir la escena descomprimida | Se ve el camión enlazado |
 | PC B cambia el maestro y lo sube, con la escena abierta en PC A y Mi carpeta abierta | En A, en unos segundos: **Cambió en el disco** → **Recargar para ver los cambios** muestra el cambio sin cerrar la escena |
 | Lo mismo con Mi carpeta cerrada en A | **Tienes la v1 · hay v2 de …** → **Actualizar y recargar** |
+| Menú de la izquierda: flecha junto a `Camiones` | Se despliegan sus carpetas y archivos; el archivo abierto queda marcado |
+| Ícono de carpeta con + sobre `Camiones` → `ASSETS` → Enter | `ASSETS` aparece "vacía" en el menú y en la tabla, y en segundos en la carpeta de PC A y PC B |
+| PC B: crear en el Explorador `Camiones\RENDERS` | Aparece en la web como carpeta vacía |
+| PC B: borrar `RENDERS` en el Explorador | Desaparece de la web y de PC A. Una carpeta con archivos no se borra |
 
 ## 9. Cuenta, actividad y búsqueda
 

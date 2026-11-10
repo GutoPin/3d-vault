@@ -49,15 +49,44 @@ export class Api {
 }
 
 // walk lista los archivos de una carpeta, con ruta relativa y separador "/".
-export async function walk(dir, prefix = '', out = new Map()) {
+// Si se pasa dirs, también anota cada subcarpeta.
+export async function walk(dir, prefix = '', out = new Map(), dirs = null) {
   for await (const [name, handle] of dir.entries()) {
     if (ignored(name)) continue;
     const path = prefix + name;
-    if (handle.kind === 'directory') await walk(handle, path + '/', out);
-    else out.set(keyOf(path), { path, handle, parent: dir, name });
+    if (handle.kind === 'directory') {
+      dirs?.set(keyOf(path), { path, handle, parent: dir, name });
+      await walk(handle, path + '/', out, dirs);
+    } else out.set(keyOf(path), { path, handle, parent: dir, name });
   }
   return out;
 }
+
+// parentDirs devuelve las carpetas que contienen una ruta: "a/b/c.png" → a, a/b.
+function parentDirs(path) {
+  const parts = path.split('/').slice(0, -1);
+  return parts.map((_, i) => parts.slice(0, i + 1).join('/'));
+}
+
+// FolderMemory recuerda, por proyecto, las carpetas que había a los dos lados en
+// la última pasada. Así se distingue una carpeta nueva de una que se borró en el
+// otro lado. Vive en localStorage; sin él, nunca se propaga un borrado.
+export const folderMemory = {
+  get(project) {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(`3dvault-carpetas-${project}`)) || []);
+    } catch {
+      return new Set();
+    }
+  },
+  set(project, keys) {
+    try {
+      localStorage.setItem(`3dvault-carpetas-${project}`, JSON.stringify([...keys]));
+    } catch {
+      // Sin almacenamiento: las carpetas se siguen creando, pero no se borran.
+    }
+  },
+};
 
 async function parentOf(root, path, create) {
   const parts = path.split('/');
@@ -120,8 +149,8 @@ export async function pushFile(api, file, { scan: doScan, assetId, baseVersion, 
 // Project sincroniza un proyecto con su carpeta. state guarda, por archivo, la
 // versión que hay en disco: {get, put, delete, all} sobre IndexedDB.
 export class Project {
-  constructor({ api, me, clientId, project, root, state, log = () => {}, progress = () => {} }) {
-    Object.assign(this, { api, me, clientId, project, root, state, log, progress });
+  constructor({ api, me, clientId, project, root, state, log = () => {}, progress = () => {}, folders = folderMemory }) {
+    Object.assign(this, { api, me, clientId, project, root, state, log, progress, folders });
     this.scans = new Map(); // key → {size, mtime, scan}: evita recalcular archivos que no cambian
     this.rows = [];
   }
@@ -152,7 +181,8 @@ export class Project {
   // para la interfaz. confirmFirst recibe el total a bajar en la primera vez.
   async sync({ confirmFirst } = {}) {
     const snap = await this.api.json('GET', `/api/projects/${this.project.id}/snapshot`);
-    const local = await walk(this.root);
+    const localDirs = new Map();
+    const local = await walk(this.root, '', new Map(), localDirs);
     const states = new Map((await this.state.all(this.project.id)).map((r) => [r.key, r]));
     const rows = [];
 
@@ -188,10 +218,79 @@ export class Project {
     }
 
     for (const [key, l] of local) rows.push({ key, local: l, status: 'new' });
+    try {
+      await this.syncFolders(snap, localDirs);
+    } catch (err) {
+      this.log(`No se pudieron sincronizar las carpetas: ${err.message}`);
+    }
     await this.findMoves(rows);
     rows.sort((a, b) => (a.asset?.path ?? a.local.path).localeCompare(b.asset?.path ?? b.local.path));
     this.rows = rows.filter((r) => !r.movedTo);
     return this.rows;
+  }
+
+  // syncFolders iguala las carpetas, también las vacías. Una carpeta nueva en un
+  // lado se crea en el otro. Una que existía en los dos y desaparece de uno se
+  // borra del otro, pero solo si está vacía: los archivos tienen sus propias
+  // reglas y nunca se borran por una carpeta.
+  async syncFolders(snap, localDirs) {
+    const server = new Map(); // clave → ruta
+    const explicit = new Set(snap.folders.map((f) => keyOf(f.path)));
+    const withFiles = new Set();
+    for (const f of snap.folders) for (const d of [...parentDirs(f.path), f.path]) server.set(keyOf(d), d);
+    for (const a of snap.assets) {
+      for (const d of parentDirs(a.path)) {
+        server.set(keyOf(d), d);
+        withFiles.add(keyOf(d));
+      }
+    }
+    const known = this.folders.get(this.project.id);
+    const now = new Set();
+
+    // Del servidor a la carpeta.
+    for (const [key, path] of [...server].sort((a, b) => a[1].length - b[1].length)) {
+      if (localDirs.has(key)) {
+        now.add(key);
+        continue;
+      }
+      if (known.has(key) && explicit.has(key) && !withFiles.has(key)) {
+        // Estaba en esta PC y alguien la borró aquí: se borra en el servidor.
+        await this.api.json('DELETE', `/api/projects/${this.project.id}/folders?path=${encodeURIComponent(path)}`).catch((err) => {
+          if (err.status !== 404) throw err;
+        });
+        this.log(`Carpeta ${path} borrada también en el servidor.`);
+        continue;
+      }
+      if (known.has(key) && !withFiles.has(key)) continue; // su padre se borró aquí
+      let dir = this.root;
+      for (const part of path.split('/')) dir = await dir.getDirectoryHandle(part, { create: true });
+      now.add(key);
+      if (!withFiles.has(key)) this.log(`Carpeta ${path} creada en esta PC.`);
+    }
+
+    // De la carpeta al servidor. Las más profundas primero, para borrar.
+    for (const [key, d] of [...localDirs].sort((a, b) => b[1].path.length - a[1].path.length)) {
+      if (server.has(key)) continue;
+      if (known.has(key)) {
+        // Se borró en el servidor: se quita aquí si quedó vacía.
+        let empty = true;
+        for await (const [name] of d.handle.entries()) {
+          if (!ignored(name)) {
+            empty = false;
+            break;
+          }
+        }
+        if (empty) {
+          await d.parent.removeEntry(d.name, { recursive: true });
+          this.log(`Carpeta ${d.path} quitada: se borró en el servidor.`);
+          continue;
+        }
+      }
+      await this.api.json('POST', `/api/projects/${this.project.id}/folders`, { path: d.path });
+      now.add(key);
+      this.log(`Carpeta ${d.path} creada en el servidor.`);
+    }
+    this.folders.set(this.project.id, now);
   }
 
   // findMoves empareja un archivo nuevo con uno que falta y tiene el mismo

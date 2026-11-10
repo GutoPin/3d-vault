@@ -121,6 +121,7 @@ También puedes copiar o guardar el archivo dentro de la carpeta del proyecto. E
 
 - **Elegir una carpeta** sube la carpeta entera con sus subcarpetas: por ejemplo una escena con su carpeta `texturas` y sus maestros. También puedes arrastrar archivos o carpetas sobre la página.
 - Cada carpeta de la lista tiene **Agregar aquí**, para subir dentro de ella.
+- **Carpetas vacías:** en el menú de la izquierda, la flecha junto al proyecto despliega sus carpetas y archivos. El ícono de carpeta con + crea una carpeta nueva, y la papelera borra una vacía. Mi carpeta las crea o borra también en tu PC, y al revés: una carpeta que crees en el Explorador aparece en la web. Una carpeta con archivos nunca se borra sola.
 - Antes de subir te muestra qué es nuevo, qué ya existía (recibe una versión nueva si cambió) y qué está bloqueado por otra persona (no se toca).
 
 Si tienes varios archivos nuevos o cambiados, el botón **Subir todo** junto al nombre del proyecto los sube de una vez con el mismo comentario.

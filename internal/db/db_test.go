@@ -274,3 +274,61 @@ func TestBackupToDoesNotUseWriteConnection(t *testing.T) {
 		t.Fatalf("BackupTo dentro de una escritura: %v", err)
 	}
 }
+
+// La migración 0003 reconstruye events: los números de evento siguen donde
+// iban, aunque el último se haya podado, para que ningún agente pierda cambios.
+func TestFoldersMigrationKeepsEventSeq(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "vault.db")
+	raw, err := openPool(path, nil, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrations, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range migrations[:2] {
+		if _, err := raw.Exec(m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stmt := range []string{
+		`PRAGMA user_version = 2`,
+		`INSERT INTO users (username, display_name, password_hash, created_at) VALUES ('u', 'U', 'x', 1)`,
+		`INSERT INTO projects (name, name_key, created_by, created_at) VALUES ('P', 'p', 1, 1)`,
+		`INSERT INTO assets (project_id, path, path_key, ext, created_by, created_at) VALUES (1, 'a.blend', 'a.blend', '.blend', 1, 1)`,
+		`INSERT INTO events (project_id, kind, asset_id, payload_json, created_at) VALUES (1, 'locked', 1, '{}', 1), (1, 'locked', 1, '{}', 2), (1, 'locked', 1, '{}', 3)`,
+		`DELETE FROM events WHERE seq = 3`,
+	} {
+		if _, err := raw.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = raw.Close()
+
+	d, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer d.Close()
+	err = d.WriteTx(ctx, func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&n); err != nil || n != 2 {
+			t.Errorf("eventos conservados = %d, %v", n, err)
+		}
+		res, err := tx.Exec(`INSERT INTO events (project_id, kind, asset_id, payload_json, created_at) VALUES (1, 'folder_created', NULL, '{}', 4)`)
+		if err != nil {
+			return err
+		}
+		seq, _ := res.LastInsertId()
+		if seq != 4 {
+			t.Errorf("siguiente evento = %d, quiero 4", seq)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

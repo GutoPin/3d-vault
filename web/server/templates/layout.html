@@ -12,6 +12,7 @@
 <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
+<script type="module" src="/static/sidebar.js"></script>
 </head>
 <body>
 {{if .User -}}
@@ -30,7 +31,14 @@
     <a class="nav-item" href="/guia"{{if eq .Active "guide"}} aria-current="page"{{end}}>Guía</a>
     <div class="group-label">Proyectos</div>
     <a class="nav-item" href="/"{{if eq .Active "projects"}} aria-current="page"{{end}}>Todos los proyectos</a>
-    {{range .Projects}}<a class="nav-item" href="/projects/{{.ID}}"{{if eq $.ActiveProject .ID}} aria-current="page"{{end}}><span class="nav-name">{{.Name}}</span></a>
+    {{range .Projects}}<div class="nav-project" data-project="{{.ID}}"{{if eq $.ActiveProject .ID}} data-active{{end}}>
+      <div class="nav-row">
+        <button class="tree-twisty" type="button" aria-expanded="false" aria-controls="arbol-{{.ID}}" aria-label="Ver las carpetas de {{.Name}}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
+        <a class="nav-item" href="/projects/{{.ID}}"{{if eq $.ActiveProject .ID}} aria-current="page"{{end}}><span class="nav-name">{{.Name}}</span></a>
+        <button class="tree-act" type="button" data-new-folder="" title="Nueva carpeta en {{.Name}}" aria-label="Nueva carpeta en {{.Name}}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z"/><path d="M8 7.5v4M6 9.5h4"/></svg></button>
+      </div>
+      <div class="nav-tree" id="arbol-{{.ID}}" hidden></div>
+    </div>
     {{end}}
     {{if .User.IsAdmin}}<div class="group-label">Administración</div>
     <a class="nav-item" href="/admin/users"{{if eq .Active "users"}} aria-current="page"{{end}}>Usuarios</a>

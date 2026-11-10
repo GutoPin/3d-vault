@@ -3,7 +3,7 @@
 <div class="title-row">
   <div>
     <div class="crumbs"><a href="/">Proyectos</a><span>/</span><a href="/projects/{{.Data.Project.ID}}">{{.Data.Project.Name}}</a></div>
-    <h1 class="path">{{.Data.FileName}}</h1>
+    <h1 class="path" data-current-asset="{{$asset.ID}}" data-current-path="{{$asset.Path}}">{{.Data.FileName}}</h1>
     <p class="sub path">{{$asset.Path}}</p>
   </div>
   <div class="actions">

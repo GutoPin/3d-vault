@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -391,6 +392,8 @@ type treeRow struct {
 	Prefix string
 	// Links resume los enlaces del archivo: lo que usa y quién lo usa.
 	Links vault.LinkSummary
+	// Empty marca una carpeta sin archivos, que se puede borrar.
+	Empty bool
 }
 
 type projectData struct {
@@ -402,6 +405,7 @@ type projectData struct {
 	Rows         []treeRow
 	EmptyMessage string
 	HasFiles     bool
+	HasFolders   bool
 }
 
 func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
@@ -494,8 +498,13 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 		},
 		State: state,
 		Query: query,
-		Rows:  buildTree(shown, links),
+		Rows:  buildTree(shown, nil, links),
 	}
+	// Las carpetas vacías solo se ven sin filtros: no coinciden con nada.
+	if state == "" && query == "" {
+		data.Rows = buildTree(shown, snap.Folders, links)
+	}
+	data.HasFolders = len(snap.Folders) > 0
 	// La pestaña de enlaces rotos solo aparece si hay alguno, o si está elegida.
 	if len(broken) > 0 || state == stateBroken {
 		data.Tabs = append(data.Tabs, tabData{Label: "Con enlaces rotos", Href: tabHref(stateBroken), Count: len(broken), Selected: state == stateBroken})
@@ -529,22 +538,54 @@ func lockSentence(locked int) string {
 
 // buildTree convierte rutas ordenadas en filas con sus carpetas. Una carpeta solo
 // aparece cuando cambia respecto al archivo anterior.
-func buildTree(assets []vault.Asset, links map[int64]vault.LinkSummary) []treeRow {
-	rows := make([]treeRow, 0, len(assets))
+func buildTree(assets []vault.Asset, folders []vault.Folder, links map[int64]vault.LinkSummary) []treeRow {
+	// Las carpetas vacías se intercalan por ruta, como si fueran un archivo más.
+	type entry struct {
+		path  string
+		asset *vault.Asset
+	}
+	entries := make([]entry, 0, len(assets)+len(folders))
+	full := map[string]bool{} // carpetas con algún archivo dentro
+	for i := range assets {
+		entries = append(entries, entry{path: assets[i].Path, asset: &assets[i]})
+		dir := assets[i].Path
+		for {
+			cut := strings.LastIndex(dir, "/")
+			if cut < 0 {
+				break
+			}
+			dir = dir[:cut]
+			full[rules.FoldKey(dir)] = true
+		}
+	}
+	for _, f := range folders {
+		entries = append(entries, entry{path: f.Path})
+	}
+	if len(folders) > 0 {
+		slices.SortStableFunc(entries, func(a, b entry) int { return strings.Compare(rules.FoldKey(a.path), rules.FoldKey(b.path)) })
+	}
+
+	rows := make([]treeRow, 0, len(entries))
 	var current []string
-	for _, asset := range assets {
-		parts := strings.Split(asset.Path, "/")
+	for _, e := range entries {
+		parts := strings.Split(e.path, "/")
 		dirs, name := parts[:len(parts)-1], parts[len(parts)-1]
+		if e.asset == nil {
+			dirs, name = parts, ""
+		}
 
 		common := 0
-		for common < len(dirs) && common < len(current) && dirs[common] == current[common] {
+		for common < len(dirs) && common < len(current) && rules.FoldKey(dirs[common]) == rules.FoldKey(current[common]) {
 			common++
 		}
 		for i := common; i < len(dirs); i++ {
-			rows = append(rows, treeRow{Folder: true, Name: dirs[i], Depth: min(i, maxTreeDepth), Prefix: strings.Join(dirs[:i+1], "/") + "/"})
+			prefix := strings.Join(dirs[:i+1], "/")
+			rows = append(rows, treeRow{Folder: true, Name: dirs[i], Depth: min(i, maxTreeDepth), Prefix: prefix + "/", Empty: !full[rules.FoldKey(prefix)]})
 		}
 		current = dirs
-		rows = append(rows, treeRow{Name: name, Depth: min(len(dirs), maxTreeDepth), Asset: asset, Links: links[asset.ID]})
+		if e.asset != nil {
+			rows = append(rows, treeRow{Name: name, Depth: min(len(dirs), maxTreeDepth), Asset: *e.asset, Links: links[e.asset.ID]})
+		}
 	}
 	return rows
 }

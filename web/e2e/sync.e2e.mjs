@@ -55,6 +55,7 @@ const helpers = `
   window.writeFile = async (path, bytes) => { const { d, name } = await dir(path, true); const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(bytes); await w.close(); };
   window.readHash = async (path) => { const { d, name } = await dir(path); const b = await (await d.getFileHandle(name)).getFile(); return [...new Uint8Array(await crypto.subtle.digest('SHA-256', await b.arrayBuffer()))].map(x => x.toString(16).padStart(2,'0')).join(''); };
   window.list = async () => { const out = []; const walk = async (d, p) => { for await (const [n, h] of d.entries()) h.kind === 'directory' ? await walk(h, p + n + '/') : out.push(p + n); }; await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Camiones', { create: true }), ''); return out.sort(); };
+  window.dirs = async () => { const out = []; const walk = async (d, p) => { for await (const [n, h] of d.entries()) if (h.kind === 'directory') { out.push(p + n); await walk(h, p + n + '/'); } }; await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Camiones', { create: true }), ''); return out.sort(); };
   window.row = (path) => window.__3dvault.ui.engines.get(1)?.rows.find(r => (r.asset?.path ?? r.local.path) === path);
 `;
 
@@ -78,6 +79,14 @@ async function upload(page, path, comment, release = true) {
 }
 
 const step = (msg) => console.log(`✔ ${msg}`);
+
+// until repite fn, desde Node, hasta que devuelva algo verdadero.
+async function until(fn, what, timeout = 30000) {
+  for (const end = Date.now() + timeout; Date.now() < end; await new Promise((r) => setTimeout(r, 300))) {
+    if (await fn()) return;
+  }
+  throw new Error(`No pasó a tiempo: ${what}`);
+}
 try {
   const a = await pc('guto', 'contraseña-larga-1');
   // Proyecto y segunda usuaria, como lo haría el admin en la web.
@@ -259,6 +268,40 @@ try {
   await a.waitForSelector('text=Desde la ficha', { timeout: 30000 });
   await b.waitForFunction(() => window.row('modelos/camion_797F.blend')?.asset.head_version === 4 && window.row('modelos/camion_797F.blend').status === 'ok', null, { timeout: 60000 });
   step('Subir desde la ficha crea la v4 y B la recibe');
+
+  // Carpetas vacías, en los dos sentidos. A crea una desde el árbol del menú.
+  await a.waitForSelector('.nav-project[data-project="1"] .tree-file[aria-current="page"]');
+  await a.click('.nav-project[data-project="1"] .nav-row [data-new-folder]');
+  await a.fill('.tree-input', 'ASSETS');
+  await a.press('.tree-input', 'Enter');
+  await a.waitForSelector('.nav-project[data-project="1"] [data-path="ASSETS"]');
+  await a.click('.nav-project[data-project="1"] [data-path="ASSETS"] [data-new-folder]');
+  await a.fill('.tree-input', 'Vehículos');
+  await a.press('.tree-input', 'Enter');
+  await a.waitForSelector('.nav-project[data-project="1"] [data-path="ASSETS/Vehículos"]');
+  await until(async () => (await b.evaluate(() => dirs())).includes('ASSETS/Vehículos'), 'ASSETS/Vehículos en B');
+  step('Una carpeta creada en el árbol del menú aparece vacía en la carpeta de B');
+
+  await b.evaluate(() => dir('ESCENAS/Nuevas/x', true));
+  await b.click('[data-action=sync-now]');
+  const folders = () => a.evaluate(() => fetch('/api/projects/1/snapshot').then((r) => r.json()).then((s) => s.folders.map((f) => f.path)));
+  await until(async () => (await folders()).includes('ESCENAS/Nuevas'), 'ESCENAS/Nuevas en el servidor');
+  await a.goto(`${BASE}/projects/1`);
+  await a.waitForSelector('[data-page-delete-folder="ESCENAS/Nuevas/"]');
+  await a.waitForSelector('.nav-project[data-project="1"] [data-path="ESCENAS"]');
+  step('Una carpeta vacía creada en la PC de B aparece en la web, en la tabla y en el árbol');
+
+  await b.evaluate(async () => (await dir('ASSETS/Vehículos')).d.removeEntry('Vehículos'));
+  await b.click('[data-action=sync-now]');
+  await until(async () => !(await folders()).includes('ASSETS/Vehículos'), 'ASSETS/Vehículos borrada en el servidor');
+  assert.ok((await folders()).includes('ASSETS'));
+  step('Borrar una carpeta vacía en la PC de B la borra en el servidor');
+
+  await a.click('[data-page-delete-folder="ESCENAS/Nuevas/"]');
+  await a.waitForLoadState();
+  await until(async () => !(await b.evaluate(() => dirs())).includes('ESCENAS/Nuevas'), 'ESCENAS/Nuevas quitada en B');
+  assert.ok((await b.evaluate(() => dirs())).includes('ASSETS'));
+  step('Borrar una carpeta vacía en la web la quita de la carpeta de B');
 
   assert.deepEqual(errors.filter((e) => !/409|423|Failed to load resource/.test(e)), []);
   console.log('\nTodo bien.');

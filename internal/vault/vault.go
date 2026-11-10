@@ -234,7 +234,7 @@ func (s *Service) addEvent(ctx context.Context, tx *sql.Tx, projectID int64, kin
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO events(project_id, kind, asset_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)`,
-		projectID, kind, assetID, string(raw), millis(s.now()))
+		projectID, kind, nullableID(assetID), string(raw), millis(s.now()))
 	if err != nil {
 		return fmt.Errorf("registrar evento: %w", err)
 	}
@@ -432,13 +432,16 @@ type Snapshot struct {
 	Seq         int64   `json:"seq"`
 	ServerEpoch string  `json:"server_epoch"`
 	Assets      []Asset `json:"assets"`
+	// Folders son las carpetas creadas a propósito, aunque estén vacías. Las que
+	// tienen archivos se deducen de las rutas de Assets.
+	Folders []Folder `json:"folders"`
 }
 
 // GetSnapshot devuelve el estado de un proyecto. seq y los archivos salen de la
 // misma transacción: un agente que luego pida eventos desde seq no pierde ni
 // repite ningún cambio.
 func (s *Service) GetSnapshot(ctx context.Context, projectID int64) (Snapshot, error) {
-	snap := Snapshot{ProjectID: projectID, Assets: []Asset{}}
+	snap := Snapshot{ProjectID: projectID, Assets: []Asset{}, Folders: []Folder{}}
 	err := s.db.ReadTx(ctx, func(tx *sql.Tx) error {
 		if _, err := loadProject(ctx, tx, projectID); err != nil {
 			return err
@@ -451,6 +454,9 @@ func (s *Service) GetSnapshot(ctx context.Context, projectID int64) (Snapshot, e
 			return err
 		}
 
+		if snap.Folders, err = listFolders(ctx, tx, projectID); err != nil {
+			return err
+		}
 		rows, err := tx.QueryContext(ctx, `SELECT `+assetColumns+assetFrom+` AND a.project_id = ? ORDER BY a.path_key`, projectID)
 		if err != nil {
 			return fmt.Errorf("listar archivos: %w", err)
@@ -548,12 +554,14 @@ func (s *Service) EventsSince(ctx context.Context, projectIDs []int64, since int
 		for rows.Next() {
 			var (
 				e         Event
+				assetID   sql.NullInt64
 				payload   string
 				createdAt int64
 			)
-			if err := rows.Scan(&e.Seq, &e.ProjectID, &e.Kind, &e.AssetID, &payload, &createdAt); err != nil {
+			if err := rows.Scan(&e.Seq, &e.ProjectID, &e.Kind, &assetID, &payload, &createdAt); err != nil {
 				return fmt.Errorf("leer evento: %w", err)
 			}
+			e.AssetID = assetID.Int64
 			e.Payload = json.RawMessage(payload)
 			e.CreatedAt = fromMillis(createdAt)
 			page.Events = append(page.Events, e)

@@ -125,6 +125,10 @@ func describeActivity(action, detail string, restoredFrom int64) (text, note str
 		return "movió de " + from + " a " + to, ""
 	case actionDelete:
 		return "borró el archivo", ""
+	case actionCreateFolder:
+		return "creó la carpeta " + detail, ""
+	case actionDeleteFolder:
+		return "borró la carpeta " + detail, ""
 	case actionLock:
 		return "bloqueó", "En " + detail
 	case actionTakeover:
