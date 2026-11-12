@@ -27,6 +27,7 @@ En Mi carpeta, al lado del nombre del proyecto, pulsa **Carpetas…**. Desmarca 
 - Si un archivo de una carpeta desmarcada tiene cambios tuyos sin subir, o lo tienes bloqueado, **se queda** hasta que lo subas y lo liberes.
 - Para tenerla otra vez, márcala y pulsa **Guardar**: se baja de nuevo.
 - Cada PC elige las suyas. No borres carpetas a mano en el Explorador para ahorrar espacio: usa **Carpetas…**.
+- **No desmarques la carpeta de los maestros** que enlazan tus escenas: en tu PC dejarían de encontrarlos. Quita las escenas de los demás, no los maestros.
 
 **Consejo:** guarda la página en favoritos. Cada vez que la abras, el navegador te pedirá permiso para usar la carpeta: pulsa **Permitir y sincronizar**. Si te ofrece **Permitir siempre**, elígelo.
 

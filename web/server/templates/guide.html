@@ -51,6 +51,7 @@
         ├── escena_01.blend
         └── escena_02.blend</pre>
     <p class="guide-tip"><strong>Maestros compartidos entre proyectos:</strong> crea un proyecto aparte, por ejemplo «Biblioteca», y márcalo en Mi carpeta junto al proyecto donde lo usas. El enlace funciona porque los dos quedan dentro de la misma carpeta <code>3D-Vault</code>.</p>
+    <p class="guide-tip"><strong>No desmarques la carpeta de los maestros.</strong> Si en <a href="/sync">Mi carpeta</a> → <strong>Carpetas…</strong> quitas de tu PC la carpeta donde están los maestros que usan tus escenas, en tu PC esas escenas no los encuentran. Puedes quitar las escenas de otros, pero deja marcados los maestros.</p>
   </section>
 
   <section>
@@ -136,13 +137,33 @@
 <article class="guide">
   <section>
     <h2>Cómo funcionan las carpetas</h2>
-    <p>Cada proyecto es una carpeta. Lo que hay dentro es <strong>igual en la web y en la carpeta de 3D-Vault de cada PC</strong>: si cambias algo en un lado, Mi carpeta lo repite en el otro en unos segundos. Para eso, Mi carpeta tiene que estar abierta en esa PC.</p>
+    <p>Cada proyecto es una carpeta. Lo que hay dentro es <strong>igual en la web y en la carpeta de 3D-Vault de cada PC</strong>: si cambias algo en un lado, Mi carpeta lo repite en el otro en unos segundos. Para eso, Mi carpeta tiene que estar abierta en esa PC. La única excepción son las carpetas que cada uno decide no tener en su PC (abajo).</p>
     <pre class="guide-tree">Web: Mina Toquepala            Tu PC: 3D-Vault\Mina Toquepala
 ├── ASSETS/                    ├── ASSETS\
 │   └── camion.blend    ⇄      │   └── camion.blend
 └── ESCENAS/                   └── ESCENAS\
     └── panoramica.blend           └── panoramica.blend</pre>
     <p>En el menú de la izquierda, la flecha junto a cada proyecto muestra sus carpetas y archivos. Pasa el ratón sobre una carpeta para ver sus botones: <strong>carpeta con +</strong> (nueva carpeta dentro), <strong>lápiz</strong> (renombrar) y <strong>papelera</strong> (borrar). En la página del proyecto están los mismos botones, escritos, en cada carpeta.</p>
+  </section>
+
+  <section>
+    <h2>Elegir qué carpetas tener en tu PC</h2>
+    <p>Si tu disco se llena, no necesitas todo el proyecto. En <a href="/sync">Mi carpeta</a>, junto al nombre del proyecto, pulsa <span class="btn-like">Carpetas…</span>, desmarca lo que no usas y pulsa <strong>Guardar</strong>. Al lado de cada carpeta ves lo que pesa, y abajo cuánto quedará en tu PC.</p>
+    <pre class="guide-tree">Servidor: PROYECTO CISTERNA       Tu PC (Bill)
+├── ASSETS/                ✔      ├── ASSETS\
+├── ESCENAS ANIMACION/     ▣      ├── ESCENAS ANIMACION\
+│   ├── ESCENAS BILL/      ✔      │   └── ESCENAS BILL\
+│   └── ESCENAS TEFY/      ☐      │
+└── RENDERS/               ☐      (solo en el servidor)</pre>
+    <ul>
+      <li>Lo desmarcado <strong>se borra de tu PC y sigue en el servidor</strong>. Los demás no pierden nada.</li>
+      <li>Lo que otros suban a una carpeta desmarcada <strong>no se baja</strong> a tu PC.</li>
+      <li>Las carpetas nuevas que cree alguien <strong>sí se bajan</strong>; si no las quieres, desmárcalas.</li>
+      <li>Si un archivo de una carpeta desmarcada tiene cambios tuyos sin subir, o lo tienes bloqueado, <strong>se queda</strong> hasta que lo subas y lo liberes.</li>
+      <li>Para tenerla de nuevo: márcala y <strong>Guardar</strong>.</li>
+      <li>La primera vez que marcas un proyecto en Mi carpeta, eliges las carpetas antes de que se baje nada. Cada PC elige las suyas.</li>
+    </ul>
+    <p class="guide-tip"><strong>No borres carpetas en el Explorador para ganar espacio:</strong> Mi carpeta lo tomaría como un borrado que hay que confirmar en 3D-Vault. Para ganar espacio, usa <strong>Carpetas…</strong>.</p>
   </section>
 
   <section>
@@ -198,6 +219,8 @@
           <tr><td>Texturas rosas</td><td>La imagen está fuera del proyecto o con ruta absoluta</td><td>Quien subió la escena pulsa <strong>Arreglar rutas</strong> y la vuelve a subir</td></tr>
           <tr><td>Funciona en mi PC pero en la de mi compañero no</td><td>Ruta absoluta: apunta a <code>C:\Users\tu-usuario\…</code></td><td><strong>Arreglar rutas</strong> la cambia a relativa. Revisa la ficha en la web: no debe decir <span class="pill warn">Ruta absoluta</span></td></tr>
           <tr><td>No veo el cambio que hizo mi compañero en el maestro</td><td>Blender carga los maestros al abrir la escena</td><td>Pulsa <strong>Actualizar y recargar</strong> o <strong>Recargar</strong> en Archivos enlazados</td></tr>
+          <tr><td>Una escena no encuentra su maestro solo en mi PC</td><td>Desmarcaste la carpeta del maestro en <strong>Carpetas…</strong></td><td>En <a href="/sync">Mi carpeta</a> → <strong>Carpetas…</strong>, márcala de nuevo y <strong>Guardar</strong></td></tr>
+          <tr><td>A mí me falta una carpeta que mi compañero tiene</td><td>Está desmarcada en tu PC</td><td><strong>Carpetas…</strong> en Mi carpeta, márcala y <strong>Guardar</strong></td></tr>
           <tr><td>El enlace a otro proyecto no funciona</td><td>Ese proyecto no está marcado en tu Mi carpeta</td><td>Márcalo en <a href="/sync">Mi carpeta</a> para que se descargue</td></tr>
           <tr><td>El panel no muestra «Archivos enlazados»</td><td>El complemento de Blender es anterior a la versión 1.2</td><td>Pulsa <strong>Descargar la versión nueva</strong> en el panel, o bájalo en Mi carpeta → Comodidades → Conectar Blender, e instálalo igual que la primera vez</td></tr>
         </tbody>
