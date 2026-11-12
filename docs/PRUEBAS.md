@@ -34,6 +34,18 @@ Guía para probarlo a mano antes de dárselo al equipo. Cada prueba dice qué ha
 | Aceptar con el comentario propuesto | "Listo: 6 archivo(s) subidos." Aparecen 6 archivos **Al día**, sin `camion.blend1` ni `~bloqueo.tmp` |
 | PC B (InPrivate, usuario `ana`): Mi carpeta → `3D-Vault-B` → marcar `Camiones` | Pregunta "Se descargarán 6 archivo(s)" con el tamaño total. Al aceptar, los 6 quedan Al día en `3D-Vault-B\Camiones` |
 
+## 1b. Elegir carpetas (sincronización selectiva)
+
+| Paso | Debe pasar |
+|---|---|
+| PC B marca un proyecto por primera vez | Antes de bajar nada pregunta qué carpetas quiere, con el peso de cada una y el total que quedará en la PC |
+| Desmarcar una subcarpeta | Su carpeta madre queda con marca intermedia; el total baja |
+| PC B: **Carpetas…** → desmarcar `texturas` → **Guardar** | Se borra de la carpeta de B. Junto al proyecto: "Solo en el servidor: N archivo(s)". En el servidor y en A sigue igual |
+| PC A sube un archivo a `texturas` | No se baja en B |
+| PC B edita un archivo, sin subirlo, y desmarca su carpeta | Ese archivo se queda, con el aviso "Su carpeta no se sincroniza en esta PC"; los demás de la carpeta se borran de B |
+| Desmarcar una carpeta vacía | Se quita de B, pero no del servidor |
+| Volver a marcar `texturas` | Se baja otra vez |
+
 ## 2. Vistas previas
 
 Abre cada archivo desde **Camiones** en el menú, o con su nombre en la tabla.

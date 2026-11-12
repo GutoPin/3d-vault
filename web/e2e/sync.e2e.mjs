@@ -64,6 +64,21 @@ async function openSync(page) {
   await page.evaluate(helpers);
   await page.evaluate(async () => window.__3dvault.useFolder(await navigator.storage.getDirectory()));
   await page.check('[data-pick="1"]');
+  // La primera vez se eligen las carpetas; aquí, todas.
+  await page.waitForFunction(() => document.getElementById('folders-dialog').open || localStorage.getItem('3dvault-excluidas-1') !== null);
+  if (await page.evaluate(() => document.getElementById('folders-dialog').open)) await page.click('#folders-dialog button[value=ok]');
+}
+
+// chooseFolders abre "Carpetas…" y deja marcadas solo las que se indican como false.
+async function chooseFolders(page, changes) {
+  await page.click('button[data-action=folders][data-project="1"]');
+  await page.waitForSelector('#folders-dialog[open]');
+  for (const [path, on] of Object.entries(changes)) {
+    const box = page.locator(`#folders-tree input[aria-label="${path}"]`);
+    if (on) await box.check();
+    else await box.uncheck();
+  }
+  await page.click('#folders-dialog button[value=ok]');
 }
 
 const waitRow = (page, path, status, timeout = 20000) =>
@@ -352,6 +367,76 @@ try {
   await a.waitForSelector('text=Recuperado');
   await until(async () => (await b.evaluate(() => list())).includes('MAQUINAS/pala.blend'), 'pala recuperada en B');
   step('Borrar una carpeta con archivos los manda a la papelera y Recuperar los devuelve a B');
+
+  // Sincronización selectiva: B deja "texturas" solo en el servidor.
+  const snapPaths = () => a.evaluate(() => fetch('/api/projects/1/snapshot').then((r) => r.json()).then((s) => s.assets.map((x) => x.path)));
+  await a.goto(`${BASE}/sync`);
+  await a.evaluate(helpers);
+  await a.evaluate(async () => window.__3dvault.useFolder(await navigator.storage.getDirectory()));
+  await a.evaluate(() => writeFile('texturas/a.png', crypto.getRandomValues(new Uint8Array(50000))));
+  await a.click('[data-action=sync-now]');
+  await a.waitForFunction(() => window.row('texturas/a.png')?.status === 'new' && !window.__3dvault.ui.running);
+  await a.click('button[data-action=upload][data-key="texturas/a.png"]');
+  await a.click('#upload-dialog button[value=ok]');
+  await until(async () => (await b.evaluate(() => list())).includes('texturas/a.png'), 'texturas/a.png en B');
+  await chooseFolders(b, { texturas: false, ASSETS: false });
+  await until(async () => !(await b.evaluate(() => list())).includes('texturas/a.png') && !(await b.evaluate(() => dirs())).includes('texturas'), 'texturas quitada de B');
+  await until(async () => !(await b.evaluate(() => dirs())).includes('ASSETS'), 'ASSETS quitada de B');
+  await b.click('[data-action=sync-now]');
+  await b.waitForFunction(() => !window.__3dvault.ui.running);
+  assert.ok((await folders()).includes('ASSETS'), 'desmarcar una carpeta vacía no debe borrarla del servidor');
+  await b.waitForFunction(() => /Solo en el servidor: 1 archivo/.test(document.getElementById('project-tables').textContent));
+  assert.ok((await snapPaths()).includes('texturas/a.png'), 'texturas/a.png sigue en el servidor');
+  await a.click('[data-action=sync-now]');
+  await a.waitForFunction(() => window.row('texturas/a.png')?.status === 'ok' && !window.__3dvault.ui.running);
+  assert.ok((await a.evaluate(() => list())).includes('texturas/a.png'));
+  step('Desmarcar "texturas" y "ASSETS" (vacía) en B las quita de su disco y siguen en el servidor y en A');
+
+  await a.evaluate(() => writeFile('texturas/nueva.png', crypto.getRandomValues(new Uint8Array(30000))));
+  await a.click('[data-action=sync-now]');
+  await a.waitForFunction(() => window.row('texturas/nueva.png')?.status === 'new' && !window.__3dvault.ui.running);
+  await a.click('button[data-action=upload][data-key="texturas/nueva.png"]');
+  await a.click('#upload-dialog button[value=ok]');
+  await until(async () => (await snapPaths()).includes('texturas/nueva.png'), 'texturas/nueva.png en el servidor');
+  await b.click('[data-action=sync-now]');
+  await b.waitForFunction(() => /Solo en el servidor: 2 archivo/.test(document.getElementById('project-tables').textContent));
+  assert.ok(!(await b.evaluate(() => list())).some((p) => p.startsWith('texturas/')));
+  step('Lo que A sube a una carpeta que B no sincroniza no se baja en B');
+
+  // Una carpeta con trabajo sin subir: ese archivo se queda; el resto se libera.
+  await b.evaluate(async () => {
+    const { d } = await dir('MAQUINAS/pala.blend');
+    const bytes = new Uint8Array(await (await (await d.getFileHandle('pala.blend')).getFile()).arrayBuffer());
+    bytes[10] ^= 1;
+    await writeFile('MAQUINAS/pala.blend', bytes);
+    await writeFile('MAQUINAS/viejo.txt', new TextEncoder().encode('sin subir'));
+  });
+  await chooseFolders(b, { MAQUINAS: false });
+  await b.waitForFunction(() => window.row('MAQUINAS/pala.blend')?.outside && window.row('MAQUINAS/pala.blend').status === 'changed' && !window.__3dvault.ui.running);
+  assert.match(await b.textContent('#project-tables'), /Su carpeta no se sincroniza en esta PC/);
+  assert.ok((await b.evaluate(() => list())).includes('MAQUINAS/pala.blend'));
+  assert.ok((await snapPaths()).includes('MAQUINAS/pala.blend'));
+  step('Al desmarcar una carpeta, un archivo con cambios sin subir se queda en B con aviso');
+
+  await chooseFolders(b, { MAQUINAS: true, texturas: true, ASSETS: true });
+  await until(async () => { const l = await b.evaluate(() => list()); return l.includes('texturas/a.png') && l.includes('texturas/nueva.png'); }, 'texturas de vuelta en B');
+  await until(async () => (await b.evaluate(() => dirs())).includes('ASSETS'), 'ASSETS de vuelta en B');
+  step('Volver a marcar "texturas" la baja de nuevo');
+
+  // Una PC nueva elige las carpetas antes de bajar nada.
+  const c = await pc('ana', 'contraseña-larga-2');
+  await c.goto(`${BASE}/sync`);
+  await c.evaluate(helpers);
+  await c.evaluate(async () => window.__3dvault.useFolder(await navigator.storage.getDirectory()));
+  await c.check('[data-pick="1"]');
+  await c.waitForSelector('#folders-dialog[open]');
+  assert.match(await c.textContent('#folders-title'), /qué carpetas quieres en esta PC/);
+  await c.locator('#folders-tree input[aria-label="MAQUINAS"]').uncheck();
+  assert.match(await c.textContent('#folders-total'), /En esta PC:/);
+  await c.click('#folders-dialog button[value=ok]');
+  await until(async () => { const l = await c.evaluate(() => list()); return l.includes('texturas/nueva.png'); }, 'texturas en C');
+  assert.ok(!(await c.evaluate(() => list())).some((p) => p.startsWith('MAQUINAS/')));
+  step('Una PC nueva elige las carpetas antes de la primera descarga y no baja las que desmarca');
 
   assert.deepEqual(errors.filter((e) => !/409|423|Failed to load resource/.test(e)), []);
   console.log('\nTodo bien.');

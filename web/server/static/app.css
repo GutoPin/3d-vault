@@ -528,3 +528,19 @@ ul.guide-steps { list-style: disc; }
 .deleted-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .pending-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--pill-warning-bg); color: var(--pill-warning-ink); font-weight: 600; display: inline-grid; place-items: center; }
 .pending-banner .upload-plan li { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+
+/* elegir carpetas que se sincronizan */
+.folders-dialog { width: min(640px, calc(100vw - 32px)); }
+.folders-dialog form { display: grid; gap: 12px; }
+.folders-tree { max-height: min(420px, 55vh); overflow: auto; padding: 8px 4px; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.folders-tree ul { list-style: none; margin: 0; padding-left: 20px; }
+.folders-tree > ul { padding-left: 4px; }
+.folders-tree li { margin: 2px 0; }
+.folders-tree summary { cursor: pointer; }
+.folders-tree li > .folder-line { padding-left: 14px; }
+.folder-line { display: inline-flex; align-items: center; gap: 8px; padding: 2px 0; }
+.folder-line input { width: 16px; height: 16px; accent-color: var(--text); }
+.folder-name { font-weight: 500; }
+.folders-total { font-weight: 500; }
+.remote-note { color: var(--muted); }
+.ledger-head p .btn + .btn { margin-left: 8px; }

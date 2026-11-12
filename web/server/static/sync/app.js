@@ -1,5 +1,5 @@
 // Interfaz de "Mi carpeta". La lógica de sincronización está en engine.js.
-import { Api, ApiError, Project, ignored, keyOf } from './engine.js';
+import { Api, ApiError, Project, folderSelection, folderTree, ignored, keyOf, underAny } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTO_EVERY = 60_000;
@@ -143,7 +143,7 @@ function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (k === 'class') node.className = v;
-    else if (k.startsWith('data-')) node.setAttribute(k, v);
+    else if (k.includes('-')) node.setAttribute(k, v); // data-*, aria-*
     else node[k] = v;
   }
   node.append(...children.filter((c) => c != null && c !== false));
@@ -197,6 +197,7 @@ function statusCell(row) {
   if (row.lockedByMe && row.status !== 'locked') owner = 'Bloqueado por ti';
   if (row.status === 'changed' && !lock) owner = 'Sin bloquear: bloquéalo para que nadie suba encima.';
   if (row.status === 'moved') owner = `Antes: ${row.from.asset.path}. Muévelo en el servidor para conservar su historial.`;
+  if (row.outside) owner = `${owner ? `${owner}. ` : ''}Su carpeta no se sincroniza en esta PC: se quitará cuando lo subas y liberes.`;
   return el('td', { class: row.status === 'error' ? 'sync-error' : '' }, text, owner && el('span', { class: 'sub' }, owner));
 }
 
@@ -255,7 +256,10 @@ function render() {
     ));
     box.append(
       el('div', { class: 'ledger-head' }, el('h2', {}, p.name),
-        el('p', {}, `Carpeta: ${safeName(p.name)}`, toUpload > 0 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id }, `Subir cambios (${toUpload})`))),
+        el('p', {}, `Carpeta: ${safeName(p.name)}`,
+          engine?.remote.files > 0 && el('span', { class: 'remote-note' }, ` · Solo en el servidor: ${engine.remote.files} archivo(s), ${formatBytes(engine.remote.bytes)}`),
+          el('button', { class: 'btn', type: 'button', 'data-action': 'folders', 'data-project': p.id, title: 'Elegir qué carpetas de este proyecto se bajan a esta PC' }, 'Carpetas…'),
+          toUpload > 0 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id }, `Subir cambios (${toUpload})`))),
       el('div', { class: 'panel table-panel drop-zone', 'data-drop': p.id }, rows.length
         ? el('div', { class: 'table-wrap' }, el('table', { class: 'stack-table' },
             el('thead', {}, el('tr', {}, el('th', {}, 'Archivo'), el('th', { class: 'n' }, 'Versión'), el('th', { class: 'n' }, 'Tamaño'), el('th', {}, 'Estado'), el('th', {}, ''))),
@@ -304,6 +308,82 @@ function renderPicks() {
     const input = el('input', { type: 'checkbox', checked: ui.selected.has(p.id), 'data-pick': p.id });
     box.append(el('label', { class: 'check' }, input, `${p.name}`));
   }
+}
+
+// ---------- carpetas que se sincronizan en esta PC ----------
+
+// chooseFolders muestra el árbol de carpetas del proyecto y guarda las que esta
+// PC no sincroniza. Devuelve true si se guardó. snap puede faltar: se pide.
+async function chooseFolders(project, snap, first = false) {
+  snap ??= await ui.api.json('GET', `/api/projects/${project.id}/snapshot`);
+  const tree = folderTree(snap);
+  if (!tree.children.length) {
+    folderSelection.set(project.id, []);
+    return true; // sin carpetas no hay nada que elegir
+  }
+  const excluded = folderSelection.get(project.id);
+  const checked = new Map();
+  const parent = new Map();
+  const all = [];
+  const visit = (n, up) => {
+    for (const c of n.children) {
+      checked.set(c.key, !underAny(c.path, excluded));
+      parent.set(c.key, up);
+      all.push(c);
+      visit(c, c);
+    }
+  };
+  visit(tree, null);
+  const below = (n) => n.children.flatMap((c) => [c, ...below(c)]);
+
+  const boxes = new Map();
+  const draw = () => {
+    for (const n of all) {
+      const box = boxes.get(n.key);
+      const mixed = checked.get(n.key) && below(n).some((c) => !checked.get(c.key));
+      box.checked = checked.get(n.key) && !mixed;
+      box.indeterminate = mixed;
+    }
+    const out = all.filter((n) => !checked.get(n.key) && (!parent.get(n.key) || checked.get(parent.get(n.key).key)));
+    const left = tree.bytes - out.reduce((s, n) => s + n.bytes, 0);
+    $('folders-total').textContent = `En esta PC: ${formatBytes(left)} de ${formatBytes(tree.bytes)}.`;
+    const every = all.every((n) => checked.get(n.key));
+    $('folders-all').checked = every;
+    $('folders-all').indeterminate = !every && all.some((n) => checked.get(n.key));
+    return out;
+  };
+  const branch = (n) => {
+    const box = el('input', { type: 'checkbox', 'aria-label': n.path });
+    box.addEventListener('change', () => {
+      for (const c of [n, ...below(n)]) checked.set(c.key, box.checked);
+      // Marcar una subcarpeta marca también las que la contienen.
+      if (box.checked) for (let up = parent.get(n.key); up; up = parent.get(up.key)) checked.set(up.key, true);
+      draw();
+    });
+    boxes.set(n.key, box);
+    const label = el('span', { class: 'folder-line' }, box, el('span', { class: 'folder-name' }, n.name),
+      el('span', { class: 'sub' }, `${formatBytes(n.bytes)} · ${n.files} archivo(s)`));
+    if (!n.children.length) return el('li', {}, label);
+    return el('li', {}, el('details', { open: n.path.split('/').length < 2 }, el('summary', {}, label), el('ul', {}, ...n.children.map(branch))));
+  };
+  $('folders-tree').replaceChildren(el('ul', {}, ...tree.children.map(branch)));
+  $('folders-all').onchange = () => {
+    for (const n of all) checked.set(n.key, $('folders-all').checked);
+    draw();
+  };
+  draw();
+
+  $('folders-title').textContent = first ? `${project.name}: ¿qué carpetas quieres en esta PC?` : `${project.name}: carpetas que se sincronizan`;
+  const dialog = $('folders-dialog');
+  dialog.returnValue = '';
+  dialog.showModal();
+  await new Promise((resolve) => dialog.addEventListener('close', resolve, { once: true }));
+  if (dialog.returnValue !== 'ok') return false;
+  const out = draw();
+  folderSelection.set(project.id, out.map((n) => n.key));
+  if (out.length) log(`${project.name}: sin sincronizar en esta PC: ${out.map((n) => n.path).join(', ')}.`);
+  else log(`${project.name}: se sincronizan todas las carpetas.`);
+  return true;
 }
 
 // ---------- sincronización ----------
@@ -503,6 +583,11 @@ const actions = {
       log(`${row.asset?.path ?? row.local.path}: ${msg}`);
     });
   },
+  folders: async (engine) => {
+    const saved = await chooseFolders(engine.project, engine.snap);
+    if (saved) await syncAll(true);
+  },
+  'cancel-folders': () => $('folders-dialog').close(),
   'upload-all': (engine) => uploadMany(engine, new Set(engine.rows.map((r) => r.key)), 'Subir cambios'),
   install: async () => {
     if (!installPrompt) return;
@@ -559,9 +644,27 @@ document.addEventListener('click', (e) => {
   if (row) fn(engine, row);
 });
 
-document.addEventListener('change', (e) => {
+document.addEventListener('change', async (e) => {
   const id = e.target.dataset?.pick;
   if (!id) return;
+  const project = ui.projects.find((p) => p.id === Number(id));
+  // La primera vez, se eligen las carpetas antes de bajar nada.
+  if (e.target.checked && project && !folderSelection.has(project.id)) {
+    const box = e.target;
+    box.disabled = true;
+    try {
+      if (!(await chooseFolders(project, null, true))) {
+        box.checked = false;
+        return;
+      }
+    } catch (err) {
+      fail(err);
+      box.checked = false;
+      return;
+    } finally {
+      box.disabled = false;
+    }
+  }
   if (e.target.checked) ui.selected.add(Number(id));
   else ui.selected.delete(Number(id));
   store('3dvault-projects', [...ui.selected]);

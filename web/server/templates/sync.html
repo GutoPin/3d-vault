@@ -137,5 +137,19 @@
   </form>
 </dialog>
 
+<dialog id="folders-dialog" class="panel folders-dialog">
+  <form method="dialog">
+    <h2 id="folders-title">Elige las carpetas para sincronizar</h2>
+    <p class="sub">Las carpetas sin marcar se quedan en el servidor y no se bajan a esta PC. Si ya las tenías, se quitan de esta PC para liberar espacio. Los archivos con cambios sin subir o bloqueados por ti se quedan hasta que los subas. Cada PC elige las suyas.</p>
+    <label class="check folders-all"><input type="checkbox" id="folders-all"> Seleccionar todo</label>
+    <div class="folders-tree" id="folders-tree"></div>
+    <p class="folders-total" id="folders-total" role="status"></p>
+    <div class="form-foot">
+      <button class="btn ghost" type="button" data-action="cancel-folders">Cancelar</button>
+      <button class="btn primary" type="submit" value="ok">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <script type="module" src="/static/sync/app.js"></script>
 {{end}}

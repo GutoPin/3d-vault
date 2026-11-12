@@ -117,6 +117,21 @@ Estilo `achromatic-ledger` de la skill `design-taste-frontend` (semilla 19145763
 
 Revisada con capturas de Firefox a 1440 y 390 px. El inspector de la skill no se pudo ejecutar porque requiere Chrome, y el lint da 0 FAIL. La búsqueda con HTMX y el menú de teléfono no se han probado de forma interactiva; las rutas y formularios sí tienen tests HTTP.
 
+## Sincronización selectiva (2026-11-12)
+
+Pedido del equipo: las laptops tienen un solo disco y el proyecto ya ocupa 11 GB, camino de 40–50 GB. Cada modelador necesita los assets comunes y sus escenas, no las de los demás. Se tomó como modelo la "sincronización selectiva" de Diversion, que el equipo ya conoce.
+
+| Decisión | Motivo |
+|---|---|
+| La elección es por PC y por proyecto, en `localStorage`, no en el servidor | Es una decisión sobre el disco de esa PC. La misma persona puede querer cosas distintas en la laptop y en la PC de escritorio |
+| Se guardan las carpetas **excluidas**, no las incluidas | Una carpeta nueva que crea otro se baja por defecto: nadie se queda sin un asset nuevo sin darse cuenta |
+| Al excluir, un archivo se borra de la PC solo si es igual al del servidor y no está bloqueado por ti; si no, se queda y sigue sincronizándose, con aviso | Desmarcar una carpeta nunca pierde trabajo |
+| Excluir no se interpreta como borrar: la lógica de carpetas vacías y la de borrados confirmados ignoran las carpetas excluidas, y el registro local del archivo se quita a la vez que el archivo | Si no, quitar una carpeta de la PC la borraría del servidor. La prueba lo comprueba con una carpeta vacía |
+| La primera vez que se marca un proyecto se eligen las carpetas antes de bajar nada | Si no, la laptop se llenaría primero y se liberaría después |
+| Las carpetas excluidas que quedan vacías se quitan de la PC; si tienen algo (cambios, copias de conflicto), se quedan | Liberar espacio sin tocar lo que el usuario dejó ahí |
+| Si se renombra en la web una carpeta excluida, la exclusión no la sigue y se baja con su nombre nuevo | Caso raro. Se vuelve a desmarcar |
+| El helper `el()` de Mi carpeta pone como atributo cualquier clave con guion (`aria-*`, `data-*`) | `aria-label` asignado como propiedad no llegaba al DOM: las casillas del árbol quedaban sin nombre accesible |
+
 ## Decisiones
 
 | Decisión | Motivo |

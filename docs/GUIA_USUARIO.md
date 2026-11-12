@@ -13,9 +13,20 @@
 2. Entra a la dirección de 3D-Vault y escribe tu usuario y contraseña.
 3. En el menú de la izquierda, abre **Mi carpeta**.
 4. Pulsa **Elegir carpeta**, elige la que creaste y acepta los dos avisos del navegador (**Ver archivos** y **Guardar cambios**).
-5. Marca los proyectos que quieres tener. Te dirá cuánto va a bajar; acepta.
+5. Marca los proyectos que quieres tener. Aparece **¿qué carpetas quieres en esta PC?**: desmarca las que no necesitas (por ejemplo, las escenas de otra persona) y pulsa **Guardar**. Abajo dice cuánto ocupará.
 
-Dentro de tu carpeta aparece una carpeta por proyecto, con todos sus archivos.
+Dentro de tu carpeta aparece una carpeta por proyecto, con las carpetas que marcaste.
+
+## Si tu disco se llena: elige qué carpetas tener
+
+En Mi carpeta, al lado del nombre del proyecto, pulsa **Carpetas…**. Desmarca lo que no usas (por ejemplo, deja **ASSETS** y tus escenas, y quita las escenas de los demás) y pulsa **Guardar**.
+
+- Lo desmarcado **se borra de tu PC** y **sigue en el servidor**: tus compañeros no pierden nada. Al lado del proyecto ves cuánto quedó solo en el servidor.
+- Lo que suban otros a una carpeta desmarcada **no se baja** a tu PC.
+- Las carpetas nuevas que cree alguien **sí se bajan**. Si no las quieres, desmárcalas.
+- Si un archivo de una carpeta desmarcada tiene cambios tuyos sin subir, o lo tienes bloqueado, **se queda** hasta que lo subas y lo liberes.
+- Para tenerla otra vez, márcala y pulsa **Guardar**: se baja de nuevo.
+- Cada PC elige las suyas. No borres carpetas a mano en el Explorador para ahorrar espacio: usa **Carpetas…**.
 
 **Consejo:** guarda la página en favoritos. Cada vez que la abras, el navegador te pedirá permiso para usar la carpeta: pulsa **Permitir y sincronizar**. Si te ofrece **Permitir siempre**, elígelo.
 

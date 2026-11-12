@@ -88,6 +88,74 @@ export const folderMemory = {
   },
 };
 
+// folderSelection guarda, por proyecto y en esta PC, las carpetas que no se
+// sincronizan: se quedan en el servidor y no ocupan disco. Se guardan las
+// excluidas, no las incluidas, para que una carpeta nueva se baje por defecto.
+export const folderSelection = {
+  key: (project) => `3dvault-excluidas-${project}`,
+  has(project) {
+    try {
+      return localStorage.getItem(this.key(project)) !== null;
+    } catch {
+      return false;
+    }
+  },
+  get(project) {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(this.key(project))) || []);
+    } catch {
+      return new Set();
+    }
+  },
+  set(project, keys) {
+    try {
+      localStorage.setItem(this.key(project), JSON.stringify([...keys]));
+    } catch {
+      // Sin almacenamiento: se sincroniza todo, como antes.
+    }
+  },
+};
+
+// underAny dice si una ruta es una de las carpetas, o está dentro de alguna.
+export function underAny(path, folders) {
+  const key = keyOf(path);
+  for (const f of folders) if (key === f || key.startsWith(f + '/')) return true;
+  return false;
+}
+
+// folderTree arma el árbol de carpetas del servidor con lo que ocupa cada una
+// (la última versión de sus archivos), para elegir qué sincronizar.
+export function folderTree(snap) {
+  const nodes = new Map();
+  const root = { path: '', key: '', children: [], bytes: 0, files: 0 };
+  const node = (path) => {
+    const key = keyOf(path);
+    if (!nodes.has(key)) {
+      const parts = path.split('/');
+      const n = { path, key, name: parts[parts.length - 1], bytes: 0, files: 0, children: [] };
+      nodes.set(key, n);
+      (parts.length > 1 ? node(parts.slice(0, -1).join('/')) : root).children.push(n);
+    }
+    return nodes.get(key);
+  };
+  for (const f of snap.folders ?? []) node(f.path);
+  for (const a of snap.assets) {
+    root.bytes += a.size_bytes;
+    root.files++;
+    for (const d of parentDirs(a.path)) {
+      const n = node(d);
+      n.bytes += a.size_bytes;
+      n.files++;
+    }
+  }
+  const sort = (n) => {
+    n.children.sort((x, y) => x.name.localeCompare(y.name));
+    n.children.forEach(sort);
+  };
+  sort(root);
+  return root;
+}
+
 async function parentOf(root, path, create) {
   const parts = path.split('/');
   const name = parts.pop();
@@ -149,8 +217,10 @@ export async function pushFile(api, file, { scan: doScan, assetId, baseVersion, 
 // Project sincroniza un proyecto con su carpeta. state guarda, por archivo, la
 // versión que hay en disco: {get, put, delete, all} sobre IndexedDB.
 export class Project {
-  constructor({ api, me, clientId, project, root, state, log = () => {}, progress = () => {}, folders = folderMemory }) {
-    Object.assign(this, { api, me, clientId, project, root, state, log, progress, folders });
+  constructor({ api, me, clientId, project, root, state, log = () => {}, progress = () => {}, folders = folderMemory, selection = folderSelection }) {
+    Object.assign(this, { api, me, clientId, project, root, state, log, progress, folders, selection });
+    this.snap = null; // la última foto del servidor, para elegir carpetas
+    this.remote = { files: 0, bytes: 0 }; // lo que se queda solo en el servidor
     this.scans = new Map(); // key → {size, mtime, scan}: evita recalcular archivos que no cambian
     this.rows = [];
   }
@@ -181,25 +251,40 @@ export class Project {
   // para la interfaz. confirmFirst recibe el total a bajar en la primera vez.
   async sync({ confirmFirst } = {}) {
     const snap = await this.api.json('GET', `/api/projects/${this.project.id}/snapshot`);
+    this.snap = snap;
+    const excluded = this.selection.get(this.project.id);
+    const outside = (path) => underAny(path, excluded);
     const localDirs = new Map();
     const local = await walk(this.root, '', new Map(), localDirs);
     const states = new Map((await this.state.all(this.project.id)).map((r) => [r.key, r]));
     const rows = [];
 
     if (confirmFirst && states.size === 0) {
-      const todo = snap.assets.filter((a) => !local.has(keyOf(a.path)));
+      const todo = snap.assets.filter((a) => !outside(a.path) && !local.has(keyOf(a.path)));
       const bytes = todo.reduce((s, a) => s + a.size_bytes, 0);
       if (todo.length && !(await confirmFirst(todo.length, bytes))) return this.rows;
     }
 
-    await this.followServerMoves(snap, local, states);
+    await this.followServerMoves(snap, local, states, outside);
 
+    this.remote = { files: 0, bytes: 0 };
+    let freed = 0;
     for (const asset of snap.assets) {
       const key = keyOf(asset.path);
       const row = { key, asset, local: local.get(key), rec: states.get(key) };
       local.delete(key);
       states.delete(key);
       try {
+        if (outside(asset.path)) {
+          // Carpeta que esta PC no sincroniza: se libera el disco, salvo trabajo sin subir.
+          freed += await this.leaveOnServer(row);
+          if (!row.local) {
+            this.remote.files++;
+            this.remote.bytes += asset.size_bytes;
+            continue;
+          }
+          row.outside = true;
+        }
         await this.reconcile(row);
       } catch (err) {
         row.status = 'error';
@@ -219,9 +304,11 @@ export class Project {
       await this.state.delete(rec.key);
     }
 
-    for (const [key, l] of local) rows.push({ key, local: l, status: 'new' });
+    for (const [key, l] of local) rows.push({ key, local: l, status: 'new', outside: outside(l.path) });
+    await this.dropEmptyExcluded(localDirs, outside);
+    if (freed) this.log(`Se liberaron ${(freed / 2 ** 30).toFixed(2).replace('.', ',')} GB en esta PC. Esas carpetas siguen en el servidor.`);
     try {
-      await this.syncFolders(snap, localDirs);
+      await this.syncFolders(snap, localDirs, outside);
     } catch (err) {
       this.log(`No se pudieron sincronizar las carpetas: ${err.message}`);
     }
@@ -235,12 +322,12 @@ export class Project {
   // ejemplo al renombrar una carpeta: el archivo local se cambia de lugar en vez
   // de bajarlo de nuevo. Solo si no tiene cambios sin subir; si los tiene, queda
   // donde estaba y se ve como "Nuevo" junto al del servidor, sin perder nada.
-  async followServerMoves(snap, local, states) {
+  async followServerMoves(snap, local, states, outside = () => false) {
     const byAsset = new Map([...states.values()].map((r) => [r.assetId, r]));
     for (const asset of snap.assets) {
       const key = keyOf(asset.path);
       const rec = byAsset.get(asset.id);
-      if (!rec || rec.key === key || states.has(key) || local.has(key)) continue;
+      if (!rec || rec.key === key || states.has(key) || local.has(key) || outside(asset.path)) continue;
       const old = local.get(rec.key);
       if (!old) continue;
       const file = await old.handle.getFile();
@@ -278,7 +365,51 @@ export class Project {
   // lado se crea en el otro. Una que existía en los dos y desaparece de uno se
   // borra del otro, pero solo si está vacía: los archivos tienen sus propias
   // reglas y nunca se borran por una carpeta.
-  async syncFolders(snap, localDirs) {
+  // leaveOnServer trata un archivo de una carpeta que esta PC no sincroniza. Si
+  // está igual que en el servidor y no lo tienes bloqueado, lo quita del disco y
+  // devuelve los bytes liberados. Si tiene cambios sin subir o lo tienes
+  // bloqueado, lo deja (devuelve 0) y sigue sincronizándose: nunca se pierde
+  // trabajo por desmarcar una carpeta.
+  async leaveOnServer(row) {
+    const { asset, local: l, rec } = row;
+    if (!l) {
+      if (rec) await this.state.delete(row.key);
+      return 0;
+    }
+    if (this.mine(asset.lock)) return 0;
+    const file = await l.handle.getFile();
+    let same = rec ? sameFile(rec, file) : false;
+    if (!same) {
+      const { manifest } = await this.scanCached(row.key, file);
+      same = manifest.file_sha256 === asset.file_sha256 || Boolean(rec && manifest.file_sha256 === rec.sha);
+    }
+    if (!same) return 0;
+    await l.parent.removeEntry(l.name);
+    if (rec) await this.state.delete(row.key);
+    this.scans.delete(row.key);
+    row.local = null;
+    row.rec = null;
+    return file.size;
+  }
+
+  // dropEmptyExcluded quita de la PC las carpetas excluidas que quedaron vacías,
+  // de la más profunda a la más alta. Si tienen algo, se quedan.
+  async dropEmptyExcluded(localDirs, outside) {
+    for (const [key, d] of [...localDirs].sort((a, b) => b[1].path.length - a[1].path.length)) {
+      if (!outside(d.path)) continue;
+      let empty = true;
+      for await (const _ of d.handle.entries()) {
+        empty = false;
+        break;
+      }
+      if (empty) {
+        await d.parent.removeEntry(d.name).catch(() => {});
+        localDirs.delete(key);
+      }
+    }
+  }
+
+  async syncFolders(snap, localDirs, outside = () => false) {
     const server = new Map(); // clave → ruta
     const explicit = new Set(snap.folders.map((f) => keyOf(f.path)));
     const withFiles = new Set();
@@ -292,8 +423,10 @@ export class Project {
     const known = this.folders.get(this.project.id);
     const now = new Set();
 
-    // Del servidor a la carpeta.
+    // Del servidor a la carpeta. Las excluidas no se crean, y que falten aquí
+    // no significa que se hayan borrado: nunca se borran en el servidor.
     for (const [key, path] of [...server].sort((a, b) => a[1].length - b[1].length)) {
+      if (outside(path)) continue;
       if (localDirs.has(key)) {
         now.add(key);
         continue;
@@ -315,7 +448,7 @@ export class Project {
 
     // De la carpeta al servidor. Las más profundas primero, para borrar.
     for (const [key, d] of [...localDirs].sort((a, b) => b[1].path.length - a[1].path.length)) {
-      if (server.has(key)) continue;
+      if (server.has(key) || outside(d.path)) continue;
       if (known.has(key)) {
         // Se borró en el servidor: se quita aquí si quedó vacía.
         let empty = true;
