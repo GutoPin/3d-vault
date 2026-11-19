@@ -231,6 +231,7 @@ export class Project {
     this.snap = null; // la última foto del servidor, para elegir carpetas
     this.remote = { files: 0, bytes: 0 }; // lo que se queda solo en el servidor
     this.scans = new Map(); // key → {size, mtime, scan}: evita recalcular archivos que no cambian
+    this.pass = null; // {files, bytes, doneFiles, doneBytes}: lo que baja la pasada en curso o la última
     this.rows = [];
   }
 
@@ -275,6 +276,16 @@ export class Project {
     }
 
     await this.followServerMoves(snap, local, states, outside);
+
+    // Lo que esta pasada va a bajar, para mostrar el avance total. Aproximado: un
+    // conflicto también baja, y download() cuenta lo que de verdad bajó.
+    const plan = snap.assets.filter((a) => {
+      const key = keyOf(a.path);
+      const rec = states.get(key);
+      if (outside(a.path)) return false;
+      return local.has(key) ? Boolean(rec) && rec.version < a.head_version : !rec || this.fresh;
+    });
+    this.pass = { files: plan.length, bytes: plan.reduce((s, a) => s + a.size_bytes, 0), doneFiles: 0, doneBytes: 0 };
 
     this.remote = { files: 0, bytes: 0 };
     let freed = 0;
@@ -621,7 +632,7 @@ export class Project {
         sha.update(data);
         await out.write(data);
         done += data.length;
-        this.progress({ key: row.key, action: 'Descargando', done, total });
+        this.progress({ key: row.key, path: asset.path, action: 'Descargando', done, total });
       }
       if (sha.hex() !== m.file_sha256) throw new Error('El archivo descargado no coincide con el del servidor.');
       await out.close();
@@ -635,6 +646,10 @@ export class Project {
       this.progress({ key: row.key, done: total, total });
     }
 
+    if (this.pass) {
+      this.pass.doneFiles++;
+      this.pass.doneBytes += total;
+    }
     const file = await handle.getFile();
     row.local = { path: asset.path, handle, parent: dir, name };
     row.rec = await this.record(row.key, asset, file, m.file_sha256);
@@ -648,7 +663,7 @@ export class Project {
     const r = await pushFile(this.api, file, {
       scan: () => this.scanCached(row.key, file),
       assetId: row.asset?.id, baseVersion: row.rec?.version, projectId: this.project.id, path: row.local.path, comment, releaseLock,
-      progress: (action, done, total) => this.progress({ key: row.key, action, done, total }),
+      progress: (action, done, total) => this.progress({ key: row.key, path: row.local.path, action, done, total }),
     });
     await this.record(row.key, r.result.asset, file, r.sha);
     return { noChanges: r.result.no_changes, version: r.result.version.number, reused: r.reused };

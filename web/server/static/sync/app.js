@@ -89,6 +89,9 @@ const ui = {
   running: false,
   busy: 0,
   stream: null,
+  lastSync: null, // cuándo terminó la última pasada completa
+  runningSince: 0,
+  passStart: 0,
 };
 
 if (!ui.clientId) {
@@ -178,17 +181,20 @@ function rowActions(pid, row) {
   return out;
 }
 
+const timeLeft = (secs) => (secs < 60 ? `${Math.max(1, Math.ceil(secs))} s` : `${Math.ceil(secs / 60)} min`);
+
+// rate da « · 4,2 MB/s · 30 s» para un avance {done, total, t0, d0}, o '' si aún no se sabe.
+function rate(p) {
+  const secs = (performance.now() - p.t0) / 1000;
+  if (secs <= 1 || p.done <= p.d0) return '';
+  const speed = (p.done - p.d0) / secs;
+  return ` · ${formatBytes(speed)}/s · faltan ${timeLeft((p.total - p.done) / speed)}`;
+}
+
 function statusCell(row) {
   const p = ui.progress.get(row.key);
   if (p && p.done < p.total) {
-    let rate = '';
-    const secs = (performance.now() - p.t0) / 1000;
-    if (secs > 1 && p.done > p.d0) {
-      const speed = (p.done - p.d0) / secs;
-      const left = Math.ceil((p.total - p.done) / speed);
-      rate = ` · ${formatBytes(speed)}/s · ${left < 60 ? `${left} s` : `${Math.ceil(left / 60)} min`}`;
-    }
-    return el('td', {}, `${p.action} ${Math.floor((100 * p.done) / p.total)} %${rate}`, el('progress', { max: p.total, value: p.done }));
+    return el('td', {}, `${p.action} ${Math.floor((100 * p.done) / p.total)} %${rate(p)}`, el('progress', { max: p.total, value: p.done }));
   }
   let text = STATUS[row.status] || '';
   if (row.status === 'error') text = `Error: ${row.error}`;
@@ -266,13 +272,13 @@ function render() {
             el('tbody', {}, ...body)))
         : el('p', { class: 'empty' }, !engine ? 'Sincronizando…'
           : all.length ? 'Ningún archivo coincide con el filtro.'
+          : ui.running && engine.pass?.files ? 'Bajando los archivos de este proyecto. Aparecen aquí al terminar; el avance está arriba.'
           : 'Este proyecto todavía no tiene archivos. Arrástralos aquí o cópialos en su carpeta.'),
         engine && rows.length > 0 && el('p', { class: 'drop-hint' }, 'Arrastra aquí archivos o carpetas para agregarlos al proyecto.')),
     );
   }
   if (!ui.selected.size) box.append(el('p', { class: 'empty' }, 'Marca arriba los proyectos que quieres tener en esta PC.'));
-  const state = ui.paused ? 'Sincronización en pausa.' : ui.running ? 'Sincronizando…' : 'Sincronización automática activa.';
-  $('sync-summary').textContent = pending ? `${state} ${pending} archivo(s) esperan que hagas algo.` : state;
+  renderStatus(pending);
   document.title = `${pending ? `(${pending}) ` : ''}Mi carpeta · 3D-Vault`;
   publishPending(summary);
 
@@ -295,6 +301,69 @@ function render() {
     ? `Tienes ${old.length === 1 ? 'un archivo bloqueado' : `${old.length} archivos bloqueados`} desde hace más de un día: ${old.map((r) => r.asset.path).join(', ')}. Si ya no los estás editando, súbelos o libéralos para que otros puedan trabajar.`
     : '';
   $('pause-btn').textContent = ui.paused ? 'Reanudar' : 'Pausar';
+}
+
+// renderStatus llena el recuadro de arriba: qué hace la sincronización y cuánto
+// falta, o que ya está todo al día.
+function renderStatus(pending) {
+  const box = $('sync-status');
+  box.hidden = !ui.selected.size;
+  const engines = ui.projects.filter((p) => ui.selected.has(p.id)).map((p) => ui.engines.get(p.id)).filter(Boolean);
+  const active = [...ui.progress.values()].filter((p) => p.done < p.total);
+  const passes = ui.running ? engines.map((e) => e.pass).filter(Boolean) : [];
+  const sum = (k) => passes.reduce((s, x) => s + x[k], 0);
+  const doneFiles = sum('doneFiles');
+  const files = Math.max(sum('files'), doneFiles);
+  // Lo bajado: archivos terminados más lo que va de los que están bajando.
+  const done = sum('doneBytes') + active.filter((p) => p.action === 'Descargando').reduce((s, p) => s + p.done, 0);
+  const bytes = Math.max(sum('bytes'), done);
+  const now = active[0];
+  const nowText = now && `${now.path ?? now.key}: ${now.action.toLowerCase()} ${Math.floor((100 * now.done) / now.total)} %`;
+  const at = ui.lastSync && ui.lastSync.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  let kind = 'ok';
+  let title;
+  let detail;
+  let bar = null;
+
+  if (files && doneFiles < files) {
+    kind = 'busy';
+    title = `Bajando archivos: ${doneFiles} de ${files} listos`;
+    const secs = (performance.now() - ui.passStart) / 1000;
+    const speed = secs > 1 && done > 0 ? done / secs : 0;
+    detail = `${formatBytes(done)} de ${formatBytes(bytes)}${speed ? ` · ${formatBytes(speed)}/s · faltan ${timeLeft((bytes - done) / speed)}` : ''}${nowText ? ` · ${nowText}` : ''}`;
+    bar = [done, bytes || 1];
+  } else if (now) {
+    kind = 'busy';
+    title = { Subiendo: 'Subiendo', Analizando: 'Revisando cambios en', Recuperando: 'Recuperando' }[now.action] ?? now.action;
+    title += ` ${now.path ?? now.key}`;
+    detail = `${Math.floor((100 * now.done) / now.total)} %${rate(now)}${active.length > 1 ? ` · y ${active.length - 1} más` : ''}`;
+    bar = [now.done, now.total];
+  } else if (ui.running && (!ui.lastSync || performance.now() - ui.runningSince > 800)) {
+    kind = 'busy';
+    title = 'Buscando novedades…';
+    detail = 'Comparando tu carpeta con el servidor.';
+  } else if (ui.paused) {
+    kind = 'paused';
+    title = 'Sincronización en pausa';
+    detail = 'Tus archivos no se actualizan hasta que pulses Reanudar.';
+  } else if (pending) {
+    kind = 'warn';
+    title = `${pending} ${pending === 1 ? 'archivo espera' : 'archivos esperan'} que hagas algo`;
+    detail = `Están abajo, con el botón de lo que falta.${at ? ` Revisado a las ${at}.` : ''}`;
+  } else {
+    const rows = engines.flatMap((e) => e.rows).filter((r) => r.status === 'ok' || r.status === 'locked');
+    const size = rows.reduce((s, r) => s + r.asset.size_bytes, 0);
+    title = 'Todo al día';
+    detail = `${rows.length} ${rows.length === 1 ? 'archivo' : 'archivos'}, ${formatBytes(size)} en esta PC.${at ? ` Revisado a las ${at}; se revisa solo cada minuto.` : ''}`;
+  }
+
+  box.dataset.kind = kind;
+  if ($('status-title').textContent !== title) $('status-title').textContent = title;
+  $('status-detail').textContent = detail;
+  $('status-bar').hidden = !bar;
+  if (bar) [$('status-bar').value, $('status-bar').max] = bar;
+  $('sync-now').disabled = ui.running;
+  $('sync-now').textContent = ui.running ? 'Sincronizando…' : 'Sincronizar ahora';
 }
 
 function renderPicks() {
@@ -450,6 +519,9 @@ function syncAll(manual = false) {
 async function syncOnce(manual) {
   ui.running = true;
   ui.busy++;
+  ui.runningSince = ui.passStart = performance.now();
+  for (const e of ui.engines.values()) e.pass = null;
+  setTimeout(scheduleRender, 900); // si la pasada tarda, se muestra «Buscando novedades…»
   render();
   try {
     for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
@@ -457,9 +529,12 @@ async function syncOnce(manual) {
       const wasFresh = engine.fresh;
       await engine.sync({ confirmFirst });
       if (wasFresh && !engine.fresh) await kvSet(`dir/${p.id}`, engine.root);
+      const got = engine.pass;
+      if (got?.doneFiles) log(`${p.name}: se ${got.doneFiles === 1 ? 'bajó 1 archivo' : `bajaron ${got.doneFiles} archivos`} (${formatBytes(got.doneBytes)}).`);
       render();
     }
-    if (manual) notice('Todo sincronizado.', true);
+    ui.lastSync = new Date();
+    if (manual) notice('Listo: todo sincronizado.', true);
   } catch (err) {
     fail(err);
   } finally {
@@ -636,7 +711,20 @@ const actions = {
     await engine.move(row);
     notice(`Movido en el servidor: ${row.from.asset.path} → ${row.local.path}. Conserva su historial.`, true);
   }),
-  restore: (engine, row) => run(() => engine.restoreMissing(row)),
+  restore: (engine, row) => {
+    // La barra aparece al pulsar, antes de que llegue el primer trozo.
+    ui.progress.set(row.key, { key: row.key, path: row.asset.path, action: 'Recuperando', done: 0, total: row.asset.size_bytes || 1, t0: performance.now(), d0: 0 });
+    scheduleRender();
+    return run(async () => {
+      try {
+        await engine.restoreMissing(row);
+      } finally {
+        ui.progress.delete(row.key);
+      }
+      notice(`Recuperado en tu PC: ${row.asset.path}.`, true);
+      log(`${row.asset.path} recuperado en tu PC.`);
+    });
+  },
   delete: (engine, row) => run(async () => {
     if (!confirm(`¿Borrar ${row.asset.path} también en 3D-Vault? Desaparecerá de las PCs de todos. Queda en la Papelera del proyecto, desde donde se puede recuperar.`)) return;
     await engine.deleteOnServer(row);

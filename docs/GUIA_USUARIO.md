@@ -46,6 +46,14 @@ Desde entonces, al encender la PC 3D-Vault se abre solo. Puedes minimizar la ven
 
 **Deja abierta la pestaña de Mi carpeta.** Mientras está abierta, cuando un compañero sube una versión nueva, tu copia se actualiza sola en unos segundos. Si la cierras, no pasa nada: al volver a abrirla se pone al día.
 
+Arriba, un recuadro te dice qué está pasando:
+
+- **Punto azul, «Bajando archivos: 3 de 12 listos»:** cuánto lleva, la velocidad y cuánto falta, con una barra.
+- **Punto verde, «Todo al día»:** tienes todo, cuántos archivos y cuánto ocupan en tu PC, y a qué hora se revisó por última vez. Se revisa solo cada minuto.
+- **Punto amarillo, «N archivos esperan que hagas algo»:** busca en la tabla los que tienen botón.
+
+En **Actividad de esta sesión** queda lo que se bajó, se subió o se recuperó.
+
 En la tabla de cada proyecto ves el estado de cada archivo:
 
 | Estado | Qué significa | Qué haces |

@@ -6,9 +6,18 @@
   </div>
   <div class="actions" id="sync-actions" hidden>
     <button class="btn" type="button" data-action="pause" id="pause-btn">Pausar</button>
-    <button class="btn primary" type="button" data-action="sync-now">Sincronizar ahora</button>
+    <button class="btn primary" type="button" data-action="sync-now" id="sync-now">Sincronizar ahora</button>
   </div>
 </div>
+
+<section class="panel sync-status" id="sync-status" hidden>
+  <span class="sync-dot" aria-hidden="true"></span>
+  <div class="sync-status-text">
+    <p class="sync-status-title" id="status-title" role="status"></p>
+    <p class="sub" id="status-detail"></p>
+    <progress id="status-bar" hidden></progress>
+  </div>
+</section>
 
 <p class="notice" id="sync-notice" role="status" hidden></p>
 <div class="notice warn pending-banner" id="pending-banner" role="status" hidden></div>

@@ -207,6 +207,7 @@ try {
   await waitRow(b, 'modelos/camion.blend', 'missing');
   await b.click('button[data-action=restore][data-key="modelos/camion.blend"]');
   await waitRow(b, 'modelos/camion.blend', 'ok');
+  await b.waitForFunction(() => /Recuperado en tu PC: modelos\/camion\.blend/.test(document.getElementById('sync-notice').textContent));
   const assets = await a.evaluate(() => fetch('/api/projects/1/snapshot').then((r) => r.json()));
   assert.equal(assets.assets.length, 1);
   step('Un borrado local no se propaga y se recupera con Descargar');
@@ -447,6 +448,9 @@ try {
   await b.waitForFunction(() => !window.__3dvault.ui.running);
   assert.deepEqual(await b.evaluate(() => window.__3dvault.ui.engines.get(1).rows.filter((r) => r.status === 'missing').map((r) => r.key)), []);
   assert.deepEqual(await folders(), serverFolders, 'cambiar de carpeta no debe borrar carpetas del servidor');
+  await b.waitForFunction(() => document.getElementById('status-title').textContent === 'Todo al día');
+  assert.match(await b.textContent('#status-detail'), /archivos, .* en esta PC\. Revisado a las/);
+  assert.match(await b.textContent('#sync-log'), /Camiones: se bajaron \d+ archivos/);
   step('Elegir otra carpeta baja todo de nuevo, sin dar archivos por borrados ni borrar carpetas del servidor');
 
   // El servidor se actualizó: la próxima respuesta trae otra versión y la página se recarga sola.
