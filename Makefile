@@ -48,10 +48,9 @@ guia-pdf:
 
 check: vet test
 
-# Sube al VPS lo que está en GitHub (origin/main) y lo reconstruye. Los datos y el
-# .env del VPS no se tocan. Uso: make deploy VPS=usuario@ip
+# Actualiza el VPS con lo que está en main en GitHub: copia de seguridad, git pull y
+# reconstrucción. El .env, el override y los datos del VPS no se tocan, y se detiene
+# si un paso falla. Otro servidor: make deploy VPS=usuario@ip
+VPS ?= root@3drepositorio.codeadevelopment.com
 deploy:
-	@test -n "$(VPS)" || { echo "Uso: make deploy VPS=usuario@ip"; exit 1; }
-	git fetch origin main
-	git archive origin/main | ssh $(VPS) 'mkdir -p ~/3d-vault && tar -x -C ~/3d-vault'
-	ssh -t $(VPS) 'cd ~/3d-vault/deploy && sudo docker compose up -d --build && sudo docker compose ps'
+	ssh -t $(VPS) 'set -e; cd ~/3d-vault/deploy; docker compose exec -T server 3dvault-server backup --to /backup; git pull --ff-only origin main; docker compose up -d --build; docker compose ps'

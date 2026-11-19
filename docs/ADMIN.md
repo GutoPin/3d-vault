@@ -112,10 +112,10 @@ Si el disco pasa del 80 %, ajusta `--keep-last` y `--older-than` a la baja, o am
 
 ## Actualizar
 
-Desde la laptop, un solo comando sube lo que está en `main` en GitHub y reconstruye el servidor:
+Sube tus cambios a `main` en GitHub y, desde la laptop, un solo comando hace en el VPS una copia de seguridad, `git pull` y la reconstrucción:
 
 ```sh
-make deploy VPS=USUARIO@IP_DEL_VPS
+make deploy
 ```
 
 No hay nada que actualizar en las PCs: Mi carpeta ve que el servidor cambió y se recarga sola cuando no hay nada a medias. Detalle en `DESPLIEGUE_VPS.md`, «Para actualizar más adelante».
