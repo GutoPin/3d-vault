@@ -112,13 +112,13 @@ Si el disco pasa del 80 %, ajusta `--keep-last` y `--older-than` a la baja, o am
 
 ## Actualizar
 
-Desde la laptop, pasa el código nuevo al VPS (ver `DESPLIEGUE_VPS.md`, paso 2) y en el VPS:
+Desde la laptop, un solo comando sube lo que está en `main` en GitHub y reconstruye el servidor:
 
 ```sh
-cd ~/3d-vault/deploy && sudo docker compose up -d --build
+make deploy VPS=USUARIO@IP_DEL_VPS
 ```
 
-No hay nada que actualizar en las PCs: los modeladores reciben la versión nueva de la página al recargarla.
+No hay nada que actualizar en las PCs: Mi carpeta ve que el servidor cambió y se recarga sola cuando no hay nada a medias. Detalle en `DESPLIEGUE_VPS.md`, «Para actualizar más adelante».
 
 ## Problemas frecuentes
 

@@ -1,5 +1,5 @@
 // Interfaz de "Mi carpeta". La lógica de sincronización está en engine.js.
-import { Api, ApiError, Project, folderSelection, folderTree, ignored, keyOf, underAny } from './engine.js';
+import { Api, ApiError, Project, appUpdated, folderSelection, folderTree, ignored, keyOf, underAny } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTO_EVERY = 60_000;
@@ -391,9 +391,17 @@ async function chooseFolders(project, snap, first = false) {
 async function engineFor(p) {
   let engine = ui.engines.get(p.id);
   if (!engine) {
-    const dir = await ui.root.getDirectoryHandle(safeName(p.name), { create: true });
+    const name = safeName(p.name);
+    let existed = true;
+    const dir = await ui.root.getDirectoryHandle(name).catch(() => {
+      existed = false;
+      return ui.root.getDirectoryHandle(name, { create: true });
+    });
+    // Si la carpeta no es la de la última pasada, lo recordado no vale para ella.
+    const last = await kvGet(`dir/${p.id}`);
+    const fresh = !existed || !last || !(await last.isSameEntry(dir).catch(() => false));
     engine = new Project({
-      api: ui.api, me: ui.me, clientId: ui.clientId, project: p, root: dir, state: stateFor(p.id),
+      api: ui.api, me: ui.me, clientId: ui.clientId, project: p, root: dir, state: stateFor(p.id), fresh,
       log: (text) => {
         log(text);
         notify(text);
@@ -446,7 +454,9 @@ async function syncOnce(manual) {
   try {
     for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
       const engine = await engineFor(p);
+      const wasFresh = engine.fresh;
       await engine.sync({ confirmFirst });
+      if (wasFresh && !engine.fresh) await kvSet(`dir/${p.id}`, engine.root);
       render();
     }
     if (manual) notice('Todo sincronizado.', true);
@@ -457,6 +467,8 @@ async function syncOnce(manual) {
     ui.busy--;
     render();
   }
+  // Se actualizó el servidor: se recarga para usar el código nuevo, si no hay nada a medias.
+  if (appUpdated && !ui.busy && !document.querySelector('dialog[open]')) location.reload();
 }
 
 function openStream() {

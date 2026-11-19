@@ -1328,3 +1328,29 @@ func TestBlenderAddonZip(t *testing.T) {
 		t.Fatalf("archivos = %v, quiero %v", names, want)
 	}
 }
+
+// Tras actualizar el servidor, Mi carpeta ve otra X-App-Version y se recarga; los
+// archivos estáticos se revalidan para que la recarga traiga el código nuevo.
+func TestStaticRevalidatesWithAppVersion(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+
+	resp := e.do(apiCall{method: http.MethodGet, path: "/static/sync/engine.js"})
+	wantStatus(t, resp, http.StatusOK)
+	etag := resp.Header.Get("ETag")
+	if resp.Header.Get("X-App-Version") != appVersion || etag != `"`+appVersion+`"` || resp.Header.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("cabeceras = %v", resp.Header)
+	}
+
+	req, err := http.NewRequestWithContext(e.ctx, http.MethodGet, e.server.URL+"/static/sync/engine.js", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("If-None-Match", etag)
+	resp, err = e.server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	wantStatus(t, resp, http.StatusNotModified)
+}

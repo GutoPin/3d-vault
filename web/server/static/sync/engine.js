@@ -18,6 +18,11 @@ export const ignored = (name) => name.toLowerCase() === '.3dvault-tmp' || IGNORE
 // keyOf aproxima path_key del servidor: sin mayúsculas y en NFC.
 export const keyOf = (path) => path.normalize('NFC').toLowerCase();
 
+// La versión de la web que dio el servidor la primera vez. Si luego responde con
+// otra, se actualizó: appUpdated avisa para recargar la página.
+let loadedVersion = null;
+export let appUpdated = false;
+
 export class ApiError extends Error {
   constructor(status, body) {
     super(body.message || `Error ${status} del servidor.`);
@@ -38,6 +43,8 @@ export class Api {
       body = JSON.stringify(body);
     }
     const res = await fetch(url, { method, headers, body });
+    const version = res.headers.get('X-App-Version');
+    if (version && (loadedVersion ??= version) !== version) appUpdated = true;
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
     return res;
   }
@@ -215,10 +222,12 @@ export async function pushFile(api, file, { scan: doScan, assetId, baseVersion, 
 }
 
 // Project sincroniza un proyecto con su carpeta. state guarda, por archivo, la
-// versión que hay en disco: {get, put, delete, all} sobre IndexedDB.
+// versión que hay en disco: {get, put, delete, all} sobre IndexedDB. fresh dice
+// que la carpeta no es la de la última pasada (se eligió otra, o la del proyecto
+// se movió o se borró): lo que falta en ella se baja en vez de darse por borrado.
 export class Project {
-  constructor({ api, me, clientId, project, root, state, log = () => {}, progress = () => {}, folders = folderMemory, selection = folderSelection }) {
-    Object.assign(this, { api, me, clientId, project, root, state, log, progress, folders, selection });
+  constructor({ api, me, clientId, project, root, state, log = () => {}, progress = () => {}, folders = folderMemory, selection = folderSelection, fresh = false }) {
+    Object.assign(this, { api, me, clientId, project, root, state, log, progress, folders, selection, fresh });
     this.snap = null; // la última foto del servidor, para elegir carpetas
     this.remote = { files: 0, bytes: 0 }; // lo que se queda solo en el servidor
     this.scans = new Map(); // key → {size, mtime, scan}: evita recalcular archivos que no cambian
@@ -259,7 +268,7 @@ export class Project {
     const states = new Map((await this.state.all(this.project.id)).map((r) => [r.key, r]));
     const rows = [];
 
-    if (confirmFirst && states.size === 0) {
+    if (confirmFirst && (states.size === 0 || this.fresh)) {
       const todo = snap.assets.filter((a) => !outside(a.path) && !local.has(keyOf(a.path)));
       const bytes = todo.reduce((s, a) => s + a.size_bytes, 0);
       if (todo.length && !(await confirmFirst(todo.length, bytes))) return this.rows;
@@ -315,6 +324,7 @@ export class Project {
     await this.findMoves(rows);
     rows.sort((a, b) => (a.asset?.path ?? a.local.path).localeCompare(b.asset?.path ?? b.local.path));
     this.rows = rows.filter((r) => !r.movedTo);
+    this.fresh = false;
     return this.rows;
   }
 
@@ -420,7 +430,8 @@ export class Project {
         withFiles.add(keyOf(d));
       }
     }
-    const known = this.folders.get(this.project.id);
+    // En una carpeta nueva, lo que falta no se borró aquí: no se borra nada.
+    const known = this.fresh ? new Set() : this.folders.get(this.project.id);
     const now = new Set();
 
     // Del servidor a la carpeta. Las excluidas no se crean, y que falten aquí
@@ -495,7 +506,7 @@ export class Project {
     row.lockedByMe = this.mine(asset.lock);
 
     if (!l) {
-      if (rec) {
+      if (rec && !this.fresh) {
         row.status = 'missing';
         return;
       }

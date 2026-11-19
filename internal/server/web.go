@@ -2,6 +2,8 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
@@ -182,6 +184,22 @@ func (s *Server) renderBare(w http.ResponseWriter, status int, title, message st
 	_, _ = buf.WriteTo(w)
 }
 
+// appVersion cambia cuando cambia la web incluida en el binario. Va en la
+// cabecera X-App-Version: Mi carpeta se recarga sola al ver una distinta.
+var appVersion = func() string {
+	h := sha256.New()
+	_ = fs.WalkDir(web.Files, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := fs.ReadFile(web.Files, p)
+		h.Write([]byte(p))
+		h.Write(b)
+		return err
+	})
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}()
+
 func (s *Server) webRoutes(r chi.Router) {
 	static, err := fs.Sub(web.Files, "server/static")
 	if err != nil {
@@ -189,7 +207,10 @@ func (s *Server) webRoutes(r chi.Router) {
 	}
 	files := http.StripPrefix("/static/", http.FileServerFS(static))
 	r.Get("/static/*", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		// Se revalida siempre (304 si no cambió): tras actualizar el servidor, la
+		// página que se recarga sola recibe el código nuevo y no el de la caché.
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("ETag", `"`+appVersion+`"`)
 		files.ServeHTTP(w, r)
 	})
 

@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e test-blender test-blender-e2e guia-pdf
+.PHONY: test test-race vet build-server build-agent-windows build-measure check test-web e2e test-blender test-blender-e2e guia-pdf deploy
 
 # Limitado a 2 núcleos y prioridad baja: la máquina de desarrollo es modesta.
 LIMITS := GOMAXPROCS=2 nice -n 19
@@ -47,3 +47,11 @@ guia-pdf:
 	cd web/e2e && npm ci --silent && node guia-pdf.mjs
 
 check: vet test
+
+# Sube al VPS lo que está en GitHub (origin/main) y lo reconstruye. Los datos y el
+# .env del VPS no se tocan. Uso: make deploy VPS=usuario@ip
+deploy:
+	@test -n "$(VPS)" || { echo "Uso: make deploy VPS=usuario@ip"; exit 1; }
+	git fetch origin main
+	git archive origin/main | ssh $(VPS) 'mkdir -p ~/3d-vault && tar -x -C ~/3d-vault'
+	ssh -t $(VPS) 'cd ~/3d-vault/deploy && sudo docker compose up -d --build && sudo docker compose ps'

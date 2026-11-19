@@ -181,7 +181,9 @@ Pulsa el nombre de un archivo para abrir su ficha. Ahí ves la miniatura de los 
 
 **Le cambié el nombre a un archivo.** Mi carpeta lo detecta y te ofrece **Mover en el servidor**, que conserva todas sus versiones.
 
-**Borré un archivo sin querer.** Pulsa **Descargar** en su fila. Borrar en tu PC nunca lo borra del servidor.
+**Borré un archivo sin querer.** Pulsa **Recuperar en mi PC** en su fila. Borrar en tu PC nunca lo borra del servidor.
+
+**Me faltan carpetas o archivos que mis compañeros sí tienen.** Deja Mi carpeta abierta un minuto: lo que falta se baja solo. Si todavía falta una carpeta, puede que la hayas desmarcado: entra en **Carpetas…**, márcala y pulsa **Guardar**. Si ves archivos en «Borrado en tu PC» que tú no borraste, **no pulses Subir cambios**, porque los borraría para todos. Pulsa **Recuperar en mi PC** y avisa al administrador.
 
 **Quiero borrarlo de verdad.** Borra el archivo de tu carpeta y pulsa **Subir cambios** (o **Confirmar borrado** en su fila). Desaparece para todos y queda en la **Papelera** del proyecto, desde donde se recupera.
 

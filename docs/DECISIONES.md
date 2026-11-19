@@ -132,6 +132,16 @@ Pedido del equipo: las laptops tienen un solo disco y el proyecto ya ocupa 11 GB
 | Si se renombra en la web una carpeta excluida, la exclusión no la sigue y se baja con su nombre nuevo | Caso raro. Se vuelve a desmarcar |
 | El helper `el()` de Mi carpeta pone como atributo cualquier clave con guion (`aria-*`, `data-*`) | `aria-label` asignado como propiedad no llegaba al DOM: las casillas del árbol quedaban sin nombre accesible |
 
+## Carpeta nueva en la misma PC (2026-11-19)
+
+Reporte del equipo: en Mi carpeta faltaban carpetas y archivos que sí estaban en el servidor. Causa: lo que Mi carpeta recuerda de la última pasada (la versión de cada archivo en IndexedDB y las carpetas en `localStorage`) es por proyecto, no por carpeta. Al pulsar **Cambiar** carpeta, o al mover o borrar la carpeta del proyecto en el Explorador, todo lo recordado faltaba en la carpeta nueva y se tomaba como borrado por el modelador: los archivos quedaban en «Borrado en tu PC: falta confirmar» sin bajarse (y **Subir cambios** los borraba para todos) y las carpetas vacías se borraban del servidor.
+
+| Decisión | Motivo |
+|---|---|
+| Se guarda el handle de la carpeta de cada proyecto tras una pasada completa (`dir/<id>` en IndexedDB). Si al abrir la carpeta no existía o no es la misma (`isSameEntry`), esa pasada es «fresca»: lo que falta se baja, no se da por borrado, y no se borra ninguna carpeta del servidor | Un borrado solo cuenta si se hizo en la misma carpeta que se sincronizó |
+| Los navegadores que vienen de la versión anterior no tienen ese handle guardado, así que su primera pasada es fresca | Repara solas las PCs que ya estaban en ese estado. A cambio, un borrado local sin confirmar de antes vuelve a bajarse, y no se pierde nada |
+| El servidor manda `X-App-Version` (hash de la web incluida en el binario) y Mi carpeta se recarga sola al ver otra, si no hay nada a medias. `/static/` pasa de `max-age=3600` a `no-cache` con ETag | La pestaña o la aplicación instalada pasan el día abiertas. Sin esto, una actualización del servidor no llegaba a nadie hasta recargar a mano |
+
 ## Decisiones
 
 | Decisión | Motivo |

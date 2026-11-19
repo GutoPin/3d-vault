@@ -34,10 +34,11 @@ En tu proveedor de DNS, crea un registro **A** de tu dominio (por ejemplo `3dvau
 
 ```sh
 cd ~/dev/3d-vault
-git archive fase-1 | ssh USUARIO@IP_DEL_VPS 'mkdir -p ~/3d-vault && tar -x -C ~/3d-vault'
+git fetch origin main
+git archive origin/main | ssh USUARIO@IP_DEL_VPS 'mkdir -p ~/3d-vault && tar -x -C ~/3d-vault'
 ```
 
-Solo viajan los archivos del commit, sin tus skills ni tus `.blend`.
+Solo viajan los archivos de `main` tal como está en GitHub, sin tus skills ni tus `.blend`. Usa siempre `main`: la rama `fase-1` quedó atrás y no tiene la sincronización de carpetas.
 
 ## 3. Instala Docker, en el VPS
 
@@ -149,8 +150,41 @@ No hay nada que instalar: todo se hace en Edge o Chrome, así que Windows no tie
 
 ## Para actualizar más adelante
 
-Repite el paso 2 con la rama que corresponda. Tu `.env` se conserva. Después, en el VPS:
+Un solo comando, desde tu laptop (pide la contraseña de `sudo` del VPS):
 
 ```sh
-cd ~/3d-vault/deploy && sudo docker compose up -d --build
+cd ~/dev/3d-vault
+make deploy VPS=USUARIO@IP_DEL_VPS
 ```
+
+Sube lo que está en `main` en GitHub y reconstruye el servidor. El `.env` y los datos no se tocan. Los dos servicios deben quedar activos, y `server` como `healthy`.
+
+**Los modeladores no tienen que hacer nada.** Mi carpeta revisa el servidor cada minuto y, cuando ve que se actualizó, se recarga sola en cuanto no hay nada a medias (ni una subida ni un diálogo abierto). Hace falta que ya tengan una versión del 19 de noviembre de 2026 o posterior: la primera vez después de esa actualización, que recarguen la página una vez (F5) o cierren y abran la aplicación.
+
+Para comprobar qué versión responde, desde cualquier PC:
+
+```sh
+curl -sI https://TU_DOMINIO/healthz | grep -i x-app-version
+```
+
+Cambia con cada actualización que toque la web.
+
+## Arreglo del 19 de noviembre de 2026: carpetas y archivos que faltaban
+
+**Qué pasaba.** Mi carpeta recuerda, en cada navegador, qué archivos y carpetas había en la última pasada. Si un modelador pulsaba **Cambiar** carpeta, o movía o borraba la carpeta del proyecto en el Explorador, lo que faltaba en la carpeta nueva se tomaba como borrado por él:
+
+- Los archivos quedaban en «Borrado en tu PC: falta confirmar» y no se bajaban. Si luego pulsaba **Subir cambios**, se borraban para todos (quedan en la Papelera).
+- Las carpetas **vacías** se borraban del servidor, y desaparecían para todos.
+
+Además, si el VPS se instaló con la rama `fase-1`, no tenía la sincronización de carpetas vacías ni el árbol de carpetas.
+
+**Qué hace ahora.** Si la carpeta del proyecto no es la de la última pasada, lo que falta se baja en vez de darse por borrado, y no se borra ninguna carpeta del servidor. Las PCs que ya estaban en ese estado se reparan solas en su primera pasada con la versión nueva.
+
+**Qué haces tú, una vez:**
+
+1. Actualiza: `make deploy VPS=USUARIO@IP_DEL_VPS`.
+2. Pide a cada modelador que recargue Mi carpeta una vez (F5, o cerrar y abrir la aplicación). Las próximas actualizaciones ya se aplican solas.
+3. Recupera lo que se haya borrado por error:
+   - **Archivos:** abre cada proyecto → **Papelera** y pulsa **Recuperar**. En **Actividad** ves quién borró qué y cuándo.
+   - **Carpetas vacías:** no van a la Papelera. Pregunta qué carpetas faltan y créalas con **Nueva carpeta** en el proyecto. Se crean solas en todas las PCs.
+4. Si alguien todavía no ve algo, revisa con esa persona **Carpetas…** en Mi carpeta: puede tenerla desmarcada.

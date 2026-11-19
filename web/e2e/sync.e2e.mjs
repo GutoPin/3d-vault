@@ -54,7 +54,7 @@ const helpers = `
   };
   window.writeFile = async (path, bytes) => { const { d, name } = await dir(path, true); const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(bytes); await w.close(); };
   window.readHash = async (path) => { const { d, name } = await dir(path); const b = await (await d.getFileHandle(name)).getFile(); return [...new Uint8Array(await crypto.subtle.digest('SHA-256', await b.arrayBuffer()))].map(x => x.toString(16).padStart(2,'0')).join(''); };
-  window.list = async () => { const out = []; const walk = async (d, p) => { for await (const [n, h] of d.entries()) h.kind === 'directory' ? await walk(h, p + n + '/') : out.push(p + n); }; await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Camiones', { create: true }), ''); return out.sort(); };
+  window.list = async (base = 'Camiones') => { const out = []; const walk = async (d, p) => { for await (const [n, h] of d.entries()) h.kind === 'directory' ? await walk(h, p + n + '/') : out.push(p + n); }; let d = await navigator.storage.getDirectory(); for (const p of base.split('/')) d = await d.getDirectoryHandle(p, { create: true }); await walk(d, ''); return out.sort(); };
   window.dirs = async () => { const out = []; const walk = async (d, p) => { for await (const [n, h] of d.entries()) if (h.kind === 'directory') { out.push(p + n); await walk(h, p + n + '/'); } }; await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Camiones', { create: true }), ''); return out.sort(); };
   window.row = (path) => window.__3dvault.ui.engines.get(1)?.rows.find(r => (r.asset?.path ?? r.local.path) === path);
 `;
@@ -437,6 +437,30 @@ try {
   await until(async () => { const l = await c.evaluate(() => list()); return l.includes('texturas/nueva.png'); }, 'texturas en C');
   assert.ok(!(await c.evaluate(() => list())).some((p) => p.startsWith('MAQUINAS/')));
   step('Una PC nueva elige las carpetas antes de la primera descarga y no baja las que desmarca');
+
+  // Elegir otra carpeta en la misma PC: lo que no está en la nueva se baja en vez
+  // de darse por borrado, y las carpetas vacías siguen en el servidor.
+  const serverFolders = await folders();
+  const serverFiles = await snapPaths();
+  await b.evaluate(async () => window.__3dvault.useFolder(await (await navigator.storage.getDirectory()).getDirectoryHandle('otra', { create: true })));
+  await until(async () => { const l = await b.evaluate(() => list('otra/Camiones')); return serverFiles.every((f) => l.includes(f)); }, 'todo bajado en la carpeta nueva de B');
+  await b.waitForFunction(() => !window.__3dvault.ui.running);
+  assert.deepEqual(await b.evaluate(() => window.__3dvault.ui.engines.get(1).rows.filter((r) => r.status === 'missing').map((r) => r.key)), []);
+  assert.deepEqual(await folders(), serverFolders, 'cambiar de carpeta no debe borrar carpetas del servidor');
+  step('Elegir otra carpeta baja todo de nuevo, sin dar archivos por borrados ni borrar carpetas del servidor');
+
+  // El servidor se actualizó: la próxima respuesta trae otra versión y la página se recarga sola.
+  let once = true;
+  await b.route('**/api/projects/1/snapshot', async (route) => {
+    const res = await route.fetch();
+    const headers = once ? { ...res.headers(), 'x-app-version': 'nueva' } : res.headers();
+    once = false;
+    await route.fulfill({ response: res, headers });
+  });
+  const reloaded = b.waitForEvent('load');
+  await b.click('[data-action=sync-now]');
+  await reloaded;
+  step('Mi carpeta se recarga sola cuando se actualiza el servidor');
 
   assert.deepEqual(errors.filter((e) => !/409|423|Failed to load resource/.test(e)), []);
   console.log('\nTodo bien.');
