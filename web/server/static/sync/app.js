@@ -1,5 +1,5 @@
 // Interfaz de "Mi carpeta". La lógica de sincronización está en engine.js.
-import { Api, ApiError, Project, appUpdated, folderSelection, folderTree, ignored, keyOf, underAny } from './engine.js';
+import { Api, ApiError, Project, appUpdated, folderSelection, loadedVersion, markUpdated, folderTree, ignored, keyOf, underAny } from './engine.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTO_EVERY = 60_000;
@@ -10,11 +10,31 @@ const EVENT_KINDS = ['asset_created', 'version_created', 'locked', 'unlocked', '
 const STATUS = {
   ok: 'Al día',
   locked: 'Bloqueado por ti',
-  changed: 'Cambios sin subir',
+  changed: 'Modificado, sin subir',
   new: 'Nuevo, sin subir',
   missing: 'Borrado en tu PC: falta confirmar',
   moved: 'Renombrado o movido',
   error: 'Error',
+};
+
+// Colores como en git: verde nuevo, amarillo modificado, rojo borrado, azul movido.
+const GIT = {
+  new: { cls: 'add', mark: '+', tip: 'Está en tu carpeta pero no en 3D-Vault. Nadie más lo ve hasta que pulses «Agregar…».' },
+  changed: { cls: 'mod', mark: '~', tip: 'Lo cambiaste en tu PC. Los demás siguen viendo la versión anterior hasta que pulses «Subir…».' },
+  missing: { cls: 'del', mark: '−', tip: 'Lo borraste de tu carpeta, pero sigue en 3D-Vault. Confirma el borrado o recupéralo.' },
+  moved: { cls: 'mov', mark: '→', tip: 'Lo renombraste o moviste en tu carpeta. Muévelo también en el servidor para no perder su historial.' },
+};
+
+// Qué hace cada botón de una fila, para el tooltip.
+const ACTION_TIPS = {
+  upload: 'Lleva tu archivo a 3D-Vault como versión nueva. Te pedirá un comentario de qué cambió.',
+  move: 'Hace el mismo cambio de nombre o carpeta en el servidor y conserva todas sus versiones.',
+  delete: 'Lo borra también en 3D-Vault. Queda en la papelera del proyecto por si acaso.',
+  restore: 'Vuelve a bajar a tu PC la última versión del servidor.',
+  unlock: 'Deja el archivo libre para que otro pueda trabajar en él.',
+  takeover: 'Lo tienes bloqueado en otra PC. Pásalo a esta para poder subir desde aquí.',
+  lock: 'Avisa a los demás que lo estás editando. Nadie podrá subir encima hasta que lo liberes.',
+  request: 'Le llega un aviso a quien lo tiene bloqueado para que lo suba y lo libere.',
 };
 
 function formatBytes(n) {
@@ -57,6 +77,11 @@ function stateFor(projectId) {
     all: () => idb('files', 'readonly', (s) => s.index('project').getAll(projectId)),
     put: (rec) => idb('files', 'readwrite', (s) => s.put({ ...rec, id: id(rec.key) })),
     delete: (key) => idb('files', 'readwrite', (s) => s.delete(id(key))),
+    // El análisis (hash y trozos) de un archivo cambiado en esta PC. Guardarlo
+    // evita releer un .blend de cientos de MB cada vez que se abre la página.
+    getScan: (key) => kvGet(`scan/${id(key)}`).catch(() => null),
+    putScan: (key, value) => kvSet(`scan/${id(key)}`, value).catch(() => {}),
+    deleteScan: (key) => idb('kv', 'readwrite', (s) => s.delete(`scan/${id(key)}`)).catch(() => {}),
   };
 }
 
@@ -104,9 +129,44 @@ function defaultClientName() {
   return `Navegador en ${platform}`;
 }
 
+// browserName da «Chrome 131 en Windows», para el diagnóstico y los avisos.
+function browserName() {
+  const ua = navigator.userAgent;
+  const brands = navigator.userAgentData?.brands?.filter((b) => !/not.?a.?brand|chromium/i.test(b.brand)) ?? [];
+  let name = brands.map((b) => `${b.brand} ${b.version}`).join(', ');
+  if (!name) name = (/Edg\/(\d+)/.exec(ua) && `Edge ${RegExp.$1}`) || (/OPR\/(\d+)/.exec(ua) && `Opera ${RegExp.$1}`) || (/Chrome\/(\d+)/.exec(ua) && `Chrome ${RegExp.$1}`) || (/Firefox\/(\d+)/.exec(ua) && `Firefox ${RegExp.$1}`) || (/Safari/.test(ua) && 'Safari') || 'desconocido';
+  if (navigator.brave) name = `Brave (${name})`;
+  const platform = navigator.userAgentData?.platform || (/Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac/.test(ua) ? 'Mac' : 'otro');
+  return `${name} en ${platform}${navigator.userAgentData?.mobile ? ' (móvil)' : ''}`;
+}
+
+// diag cuenta al servidor qué pantalla se mostró y en qué navegador. Solo queda
+// en el registro del servidor, para ayudar cuando «en un navegador no funciona».
+function diag(state, detail = '') {
+  try {
+    fetch('/api/diag', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', ...ui.api?.headers, 'X-Client-Id': ui.clientId },
+      body: JSON.stringify({ state, browser: browserName(), detail: String(detail).slice(0, 500) }),
+    }).catch(() => {});
+  } catch { /* sin red: no importa */ }
+}
+
 function show(id) {
   for (const s of ['sync-unsupported', 'sync-other-tab', 'sync-setup', 'sync-resume', 'sync-main']) $(s).hidden = s !== id;
   $('sync-actions').hidden = id !== 'sync-main';
+  // Fuera de la pantalla principal, los avisos de la sincronización quedarían viejos.
+  for (const n of ['sync-status', 'pending-banner', 'stale-locks']) if (id !== 'sync-main') $(n).hidden = true;
+  if (id === 'sync-resume') {
+    const name = ui.root?.name ?? '';
+    $('resume-folder').textContent = name;
+    $('resume-folder-line').hidden = !name;
+    for (const n of document.querySelectorAll('[data-folder-name]')) n.textContent = name ? `«${name}»` : 'la que usabas';
+    $('resume-denied').hidden = true;
+    $('resume-normal').hidden = false;
+  }
+  if (id === 'sync-unsupported') $('browser-name').textContent = browserName();
+  diag(id, id === 'sync-unsupported' ? `showDirectoryPicker: ${'showDirectoryPicker' in window}, contexto seguro: ${isSecureContext}` : '');
 }
 
 function notice(text, ok = false) {
@@ -133,6 +193,18 @@ function fail(err) {
     setTimeout(() => location.assign('/login?next=/sync'), 3000);
     return;
   }
+  if ((err?.name === 'NotAllowedError' || err?.name === 'SecurityError') && ui.root) {
+    // Se perdió el permiso de la carpeta en pleno trabajo: se vuelve a pedir.
+    diag('permiso-perdido', `${err.name}: ${err.message}`);
+    ui.root.queryPermission({ mode: 'readwrite' }).then((state) => {
+      if (state === 'granted') return notice(err.message);
+      ui.stream?.close();
+      if (state === 'denied') return showDenied();
+      show('sync-resume');
+      askOnFirstClick();
+    }).catch(() => showDenied());
+    return;
+  }
   if (err?.name === 'NotReadableError') {
     notice('Un archivo está en uso por otro programa. Se reintentará.');
     return;
@@ -145,6 +217,7 @@ function fail(err) {
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
+    if (v === undefined) continue;
     if (k === 'class') node.className = v;
     else if (k.includes('-')) node.setAttribute(k, v); // data-*, aria-*
     else node[k] = v;
@@ -154,7 +227,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 function actionButton(label, action, pid, key, primary = false) {
-  return el('button', { class: primary ? 'btn primary' : 'btn', type: 'button', 'data-action': action, 'data-project': pid, 'data-key': key }, label);
+  return el('button', { class: primary ? 'btn primary' : 'btn', type: 'button', 'data-action': action, 'data-project': pid, 'data-key': key, 'data-tip': ACTION_TIPS[action] }, label);
 }
 
 function rowActions(pid, row) {
@@ -198,6 +271,8 @@ function statusCell(row) {
   }
   let text = STATUS[row.status] || '';
   if (row.status === 'error') text = `Error: ${row.error}`;
+  const git = GIT[row.status];
+  if (git) text = el('span', { class: `pill git ${git.cls}`, 'data-tip': git.tip }, el('span', { class: 'git-mark', 'aria-hidden': 'true' }, git.mark), text);
   const lock = row.asset?.lock;
   let owner = lock && !row.lockedByMe ? `Bloqueado por ${lock.display_name}${lock.user_id === ui.me.id ? ` en ${lock.client_name}` : ''}` : null;
   if (row.lockedByMe && row.status !== 'locked') owner = 'Bloqueado por ti';
@@ -205,6 +280,30 @@ function statusCell(row) {
   if (row.status === 'moved') owner = `Antes: ${row.from.asset.path}. Muévelo en el servidor para conservar su historial.`;
   if (row.outside) owner = `${owner ? `${owner}. ` : ''}Su carpeta no se sincroniza en esta PC: se quitará cuando lo subas y liberes.`;
   return el('td', { class: row.status === 'error' ? 'sync-error' : '' }, text, owner && el('span', { class: 'sub' }, owner));
+}
+
+// skippedPanel muestra lo que hay en la carpeta y no se sube, con el motivo. Las
+// copias de conflicto van destacadas: son trabajo de la persona que no llegó a
+// 3D-Vault. Respaldos y temporales, plegados: no hace falta hacer nada.
+function skippedPanel(pid, engine) {
+  const skipped = engine?.skipped ?? [];
+  if (!skipped.length) return null;
+  const conflicts = skipped.filter((f) => f.reason === 'conflict');
+  const others = skipped.filter((f) => f.reason !== 'conflict');
+  return el('div', { class: 'skipped' },
+    conflicts.length > 0 && el('div', { class: 'panel skipped-conflicts' },
+      el('h3', {}, `${conflicts.length} ${conflicts.length === 1 ? 'copia de conflicto que no se sube' : 'copias de conflicto que no se suben'}`),
+      el('p', { class: 'sub' }, 'Cambiaste estos archivos en tu PC mientras otra persona (o tú desde otro lado) subía una versión más nueva. Para no perder nada, tu trabajo quedó guardado aparte con este nombre, y en su lugar se bajó la versión del servidor. Estas copias nunca se suben solas.'),
+      el('p', { class: 'sub' }, 'Ábrelas en Blender y compáralas. Si tu copia es la buena, pulsa «Usar mi copia» y luego Subir cambios. Si no, bórrala.'),
+      el('ul', { class: 'pending-list' }, ...conflicts.map((f) => el('li', {},
+        el('span', { class: 'pill git mod', 'data-tip': `Tu versión de ${originalOf(f.path)}` }, el('span', { class: 'git-mark', 'aria-hidden': 'true' }, '!'), 'Conflicto'),
+        el('span', { class: 'path' }, f.path),
+        el('button', { class: 'btn', type: 'button', 'data-action': 'keep-conflict', 'data-project': pid, 'data-skip': f.path,
+          'data-tip': `Pone tu copia en lugar de ${originalOf(f.path)} para que puedas subirla. La versión del servidor queda en su historial.` }, 'Usar mi copia…'))))),
+    others.length > 0 && el('details', { class: 'skipped-others' },
+      el('summary', { class: 'text-action' }, `${others.length} ${others.length === 1 ? 'archivo no se sube' : 'archivos no se suben'} a propósito (respaldos .blend1 y temporales)`),
+      el('p', { class: 'sub' }, 'Blender y Windows los crean solos (.blend1, .blend2, .tmp, nombres que empiezan con ~). No son tu trabajo y no hace falta subirlos. Si alguno sí lo es, cámbiale el nombre.'),
+      el('ul', { class: 'skipped-list' }, ...others.slice(0, 200).map((f) => el('li', {}, f.path)))));
 }
 
 // pendingCounts cuenta lo que hay en la PC y no en 3D-Vault: lo que se sube o
@@ -238,7 +337,9 @@ function publishPending(summary) {
   }
 }
 
+let lastFullRender = 0;
 function render() {
+  lastFullRender = performance.now();
   const box = $('project-tables');
   box.textContent = '';
   let pending = 0;
@@ -253,7 +354,7 @@ function render() {
     const toUpload = counts.total;
     pending += toUpload + all.filter((r) => r.status === 'error' || r.status === 'moved').length;
     if (toUpload) summary[p.id] = { name: p.name, ...counts };
-    const body = rows.map((row) => el('tr', {},
+    const body = rows.map((row) => el('tr', { class: GIT[row.status] ? `git-row ${GIT[row.status].cls}` : '' },
       el('td', {}, row.asset ? el('a', { class: 'name', href: `/assets/${row.asset.id}` }, row.asset.path) : el('span', { class: 'name' }, row.local.path)),
       el('td', { class: 'n' }, row.asset ? `v${row.asset.head_version}` : '—'),
       el('td', { class: 'n' }, formatBytes(row.asset?.size_bytes ?? row.from?.asset.size_bytes ?? 0)),
@@ -264,34 +365,47 @@ function render() {
       el('div', { class: 'ledger-head' }, el('h2', {}, p.name),
         el('p', {}, `Carpeta: ${safeName(p.name)}`,
           engine?.remote.files > 0 && el('span', { class: 'remote-note' }, ` · Solo en el servidor: ${engine.remote.files} archivo(s), ${formatBytes(engine.remote.bytes)}`),
-          el('button', { class: 'btn', type: 'button', 'data-action': 'folders', 'data-project': p.id, title: 'Elegir qué carpetas de este proyecto se bajan a esta PC' }, 'Carpetas…'),
-          toUpload > 0 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id }, `Subir cambios (${toUpload})`))),
+          el('button', { class: 'btn', type: 'button', 'data-action': 'folders', 'data-project': p.id, 'data-tip': 'Elige qué carpetas de este proyecto se bajan a esta PC. Las demás se quedan solo en el servidor.' }, 'Carpetas…'),
+          toUpload > 0 && el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': p.id, 'data-tip': 'Sube de una vez todo lo nuevo, lo modificado y los borrados de este proyecto. Antes te muestra la lista.' }, `Subir cambios (${toUpload})`))),
       el('div', { class: 'panel table-panel drop-zone', 'data-drop': p.id }, rows.length
         ? el('div', { class: 'table-wrap' }, el('table', { class: 'stack-table' },
-            el('thead', {}, el('tr', {}, el('th', {}, 'Archivo'), el('th', { class: 'n' }, 'Versión'), el('th', { class: 'n' }, 'Tamaño'), el('th', {}, 'Estado'), el('th', {}, ''))),
+            el('thead', {}, el('tr', {}, el('th', {}, 'Archivo'), el('th', { class: 'n', 'data-tip': 'La última versión que hay en 3D-Vault' }, 'Versión'), el('th', { class: 'n' }, 'Tamaño'), el('th', { 'data-tip': 'Cómo está tu copia comparada con 3D-Vault' }, 'Estado'), el('th', {}, ''))),
             el('tbody', {}, ...body)))
         : el('p', { class: 'empty' }, !engine ? 'Sincronizando…'
           : all.length ? 'Ningún archivo coincide con el filtro.'
           : ui.running && engine.pass?.files ? 'Bajando los archivos de este proyecto. Aparecen aquí al terminar; el avance está arriba.'
           : 'Este proyecto todavía no tiene archivos. Arrástralos aquí o cópialos en su carpeta.'),
         engine && rows.length > 0 && el('p', { class: 'drop-hint' }, 'Arrastra aquí archivos o carpetas para agregarlos al proyecto.')),
+      skippedPanel(p.id, engine),
     );
   }
   if (!ui.selected.size) box.append(el('p', { class: 'empty' }, 'Marca arriba los proyectos que quieres tener en esta PC.'));
+  renderTeam();
+  ui.lastPending = pending;
   renderStatus(pending);
   document.title = `${pending ? `(${pending}) ` : ''}Mi carpeta · 3D-Vault`;
   publishPending(summary);
 
-  // Aviso arriba: lo que cambió en esta PC y falta llevar a 3D-Vault.
-  const banner = $('pending-banner');
+  // Barra fija arriba: el «commit». Siempre visible, para que se sepa dónde se
+  // sube lo que se copió o cambió en la carpeta, aunque ahora no haya nada.
+  $('pending-banner').hidden = true;
   const entries = Object.entries(summary);
-  banner.hidden = !entries.length;
-  banner.replaceChildren(...(entries.length ? [
-    el('strong', {}, 'Tienes cambios en esta PC que aún no están en 3D-Vault.'),
-    ' Los demás no los ven hasta que los subas. Los borrados también hay que confirmarlos, para que nadie pierda un archivo por error.',
-    el('ul', { class: 'upload-plan' }, ...entries.map(([id, c]) => el('li', {}, `${c.name}: ${describeCounts(c)} `,
-      el('button', { class: 'btn primary', type: 'button', 'data-action': 'upload-all', 'data-project': id }, 'Subir cambios…')))),
-  ] : []));
+  const bar = $('commit-bar');
+  bar.classList.toggle('has-changes', entries.length > 0);
+  const total = entries.reduce((n, [, c]) => n + c.total, 0);
+  remindUpload(total);
+  const since = ui.pendingSince && Date.now() - ui.pendingSince > 10 * 60_000 ? ` desde ${agoFrom(ui.pendingSince)}` : '';
+  bar.replaceChildren(...(entries.length ? [
+    el('div', { class: 'commit-text' },
+      el('b', {}, `Tienes ${total} ${total === 1 ? 'cambio' : 'cambios'} en esta PC sin subir a 3D-Vault${since}`),
+      el('span', { class: 'sub' }, 'Los demás no reciben estos archivos hasta que pulses Subir cambios. Te mostrará la lista y te pedirá un comentario, como un commit.')),
+    ...entries.map(([id, c]) => el('button', { class: 'btn primary big', type: 'button', 'data-action': 'upload-all', 'data-project': id,
+      'data-tip': `${c.name}: ${describeCounts(c)}` }, entries.length > 1 ? `Subir cambios de ${c.name} (${c.total})` : `Subir cambios (${c.total})`)),
+  ] : [
+    el('div', { class: 'commit-text' },
+      el('b', {}, ui.running && !ui.lastSync ? 'Revisando tu carpeta…' : 'Todo subido: no tienes cambios pendientes'),
+      el('span', { class: 'sub' }, 'Cuando copies, cambies o borres archivos en tu carpeta, aparecerán abajo en color y aquí saldrá el botón Subir cambios.')),
+  ]));
 
   // Bloqueos propios de más de un día: un olvido frecuente que frena a los demás.
   const old = [...ui.engines.values()].flatMap((e) => e.rows)
@@ -301,6 +415,42 @@ function render() {
     ? `Tienes ${old.length === 1 ? 'un archivo bloqueado' : `${old.length} archivos bloqueados`} desde hace más de un día: ${old.map((r) => r.asset.path).join(', ')}. Si ya no los estás editando, súbelos o libéralos para que otros puedan trabajar.`
     : '';
   $('pause-btn').textContent = ui.paused ? 'Reanudar' : 'Pausar';
+}
+
+// renderTeam muestra lo último que subió cada persona. Responde a «no me llega lo
+// que hizo X»: si X no aparece o su última subida es vieja, el cambio sigue en
+// su PC y le falta pulsar Subir cambios.
+function renderTeam() {
+  const box = $('team-uploads');
+  if (!box) return;
+  const people = new Map();
+  for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
+    for (const a of ui.engines.get(p.id)?.snap?.assets ?? []) {
+      const at = Date.parse(a.updated_at);
+      const who = a.uploaded_by || '—';
+      const cur = people.get(who) ?? { who, at: 0, path: '', project: p.name, week: 0 };
+      if (Date.now() - at < 7 * 86400_000) cur.week++;
+      if (at > cur.at) Object.assign(cur, { at, path: a.path, project: p.name, id: a.id });
+      people.set(who, cur);
+    }
+  }
+  const list = [...people.values()].sort((a, b) => b.at - a.at);
+  box.hidden = !list.length;
+  $('team-list').replaceChildren(...list.map((x) => el('li', {},
+    el('b', {}, x.who === ui.me?.display_name ? `${x.who} (tú)` : x.who),
+    ` subió por última vez ${agoFrom(x.at)}: `,
+    el('a', { href: `/assets/${x.id}` }, x.path.split('/').pop()),
+    el('span', { class: 'sub' }, ` · ${x.week ? `${x.week} ${x.week === 1 ? 'archivo' : 'archivos'} esta semana` : 'nada esta semana'}`))));
+}
+
+function agoFrom(t) {
+  const m = Math.round((Date.now() - t) / 60_000);
+  if (m < 1) return 'hace un momento';
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `hace ${h} ${h === 1 ? 'hora' : 'horas'}`;
+  const d = Math.round(h / 24);
+  return `hace ${d} ${d === 1 ? 'día' : 'días'}`;
 }
 
 // renderStatus llena el recuadro de arriba: qué hace la sincronización y cuánto
@@ -341,7 +491,11 @@ function renderStatus(pending) {
   } else if (ui.running && (!ui.lastSync || performance.now() - ui.runningSince > 800)) {
     kind = 'busy';
     title = 'Buscando novedades…';
-    detail = 'Comparando tu carpeta con el servidor.';
+    const c = engines.map((e) => e.checking).filter(Boolean);
+    const checked = c.reduce((n, x) => n + x.done, 0);
+    const toCheck = c.reduce((n, x) => n + x.total, 0);
+    detail = toCheck ? `Revisando tu carpeta: ${checked} de ${toCheck} archivos.` : 'Leyendo tu carpeta y lo nuevo del servidor.';
+    if (toCheck) bar = [checked, toCheck];
   } else if (ui.paused) {
     kind = 'paused';
     title = 'Sincronización en pausa';
@@ -480,7 +634,9 @@ async function engineFor(p) {
         const same = prev?.action === pr.action;
         if (pr.done >= pr.total) ui.progress.delete(pr.key);
         else ui.progress.set(pr.key, { ...pr, t0: same ? prev.t0 : performance.now(), d0: same ? prev.d0 : pr.done });
-        scheduleRender();
+        // El recuadro de estado en cada avance; la tabla, como mucho cada 1,5 s.
+        const full = performance.now() - lastFullRender > 1500;
+        scheduleRender(full);
       },
     });
     ui.engines.set(p.id, engine);
@@ -488,13 +644,20 @@ async function engineFor(p) {
   return engine;
 }
 
-let renderQueued = false;
-function scheduleRender() {
-  if (renderQueued) return;
-  renderQueued = true;
+// scheduleRender redibuja en el próximo cuadro. Sin full, solo el recuadro de
+// estado: la tabla tiene cientos de filas y rehacerla con cada avance de una
+// descarga le quitaba tiempo a la sincronización.
+let renderQueued = null;
+function scheduleRender(full = true) {
+  if (renderQueued === 'full' || renderQueued === (full ? 'full' : 'status')) return;
+  const first = !renderQueued;
+  renderQueued = full ? 'full' : 'status';
+  if (!first) return;
   requestAnimationFrame(() => {
-    renderQueued = false;
-    render();
+    const what = renderQueued;
+    renderQueued = null;
+    if (what === 'full') render();
+    else renderStatus(ui.lastPending ?? 0);
   });
 }
 
@@ -505,7 +668,7 @@ const confirmFirst = (n, bytes) => Promise.resolve(confirm(`Se descargarán ${n}
 let current = Promise.resolve();
 let waiting = null;
 function syncAll(manual = false) {
-  if (!ui.root || (ui.paused && !manual)) return Promise.resolve();
+  if (!ui.root || $('sync-main').hidden || (ui.paused && !manual)) return Promise.resolve(); // sin permiso no se revisa
   if (!waiting) {
     waiting = current.then(() => {
       waiting = null;
@@ -521,13 +684,17 @@ async function syncOnce(manual) {
   ui.busy++;
   ui.runningSince = ui.passStart = performance.now();
   for (const e of ui.engines.values()) e.pass = null;
-  setTimeout(scheduleRender, 900); // si la pasada tarda, se muestra «Buscando novedades…»
+  setTimeout(() => scheduleRender(false), 900); // si la pasada tarda, se muestra «Buscando novedades…»
+  const ticker = setInterval(() => scheduleRender(false), 500); // con su avance
   render();
   try {
     for (const p of ui.projects.filter((p) => ui.selected.has(p.id))) {
       const engine = await engineFor(p);
       const wasFresh = engine.fresh;
+      const started = performance.now();
       await engine.sync({ confirmFirst });
+      reportSlow(p, engine, performance.now() - started);
+      reportPending(p.id, engine.rows);
       if (wasFresh && !engine.fresh) await kvSet(`dir/${p.id}`, engine.root);
       const got = engine.pass;
       if (got?.doneFiles) log(`${p.name}: se ${got.doneFiles === 1 ? 'bajó 1 archivo' : `bajaron ${got.doneFiles} archivos`} (${formatBytes(got.doneBytes)}).`);
@@ -538,12 +705,56 @@ async function syncOnce(manual) {
   } catch (err) {
     fail(err);
   } finally {
+    clearInterval(ticker);
     ui.running = false;
     ui.busy--;
     render();
   }
   // Se actualizó el servidor: se recarga para usar el código nuevo, si no hay nada a medias.
   if (appUpdated && !ui.busy && !document.querySelector('dialog[open]')) location.reload();
+}
+
+// remindUpload recuerda subir lo que lleva rato sin subirse: lo guardado en la
+// PC no les llega a los demás hasta pulsar Subir cambios, y eso es lo que más
+// confunde («subí y no le aparece»).
+function remindUpload(total) {
+  if (!total) {
+    ui.pendingSince = null;
+    ui.remindedAt = 0;
+    return;
+  }
+  ui.pendingSince ??= Date.now();
+  const waited = Date.now() - ui.pendingSince;
+  if (waited > 30 * 60_000 && Date.now() - (ui.remindedAt || 0) > 60 * 60_000) {
+    ui.remindedAt = Date.now();
+    notify(`Tienes ${total} ${total === 1 ? 'cambio' : 'cambios'} sin subir desde ${agoFrom(ui.pendingSince)}. Tus compañeros no los ven hasta que pulses Subir cambios.`);
+  }
+}
+
+// reportSlow avisa al servidor de una pasada lenta, con lo que tardó cada etapa,
+// para saber en qué PC y por qué «se demora buscando novedades».
+let lastSlow = 0;
+function reportSlow(p, engine, ms) {
+  if (ms < 8000 || Date.now() - lastSlow < 10 * 60_000) return;
+  lastSlow = Date.now();
+  const t = engine.timing ?? {};
+  const etapas = Object.entries(t).map(([k, v]) => `${k} ${k === 'archivos' ? v : `${(v / 1000).toFixed(1)} s`}`).join(', ');
+  const got = engine.pass;
+  diag('pasada-lenta', `${p.name}: ${(ms / 1000).toFixed(1)} s (${etapas}); bajó ${got?.doneFiles ?? 0} archivos, ${formatBytes(got?.doneBytes ?? 0)}`);
+}
+
+// reportPending cuenta al servidor qué tiene esta PC sin subir en un proyecto,
+// para que los demás lo vean en la web con sus colores. Solo envía si cambió o
+// cada 5 minutos, para que el aviso no caduque mientras la página siga abierta.
+const reported = new Map(); // proyecto → {body, at}
+function reportPending(pid, rows) {
+  const items = rows.filter((r) => GIT[r.status] || r.status === 'error').map((r) => ({ path: r.local?.path ?? r.asset.path, status: r.status, detail: r.error ?? '' }));
+  for (const f of ui.engines.get(pid)?.skipped ?? []) if (f.reason === 'conflict') items.push({ path: f.path, status: 'conflict', detail: `Copia de ${originalOf(f.path)}` });
+  const body = JSON.stringify(items);
+  const last = reported.get(pid);
+  if (last && last.body === body && Date.now() - last.at < 5 * 60_000) return;
+  reported.set(pid, { body, at: Date.now() });
+  ui.api.json('PUT', `/api/projects/${pid}/pending`, { items }).catch(() => reported.delete(pid));
 }
 
 function openStream() {
@@ -633,17 +844,45 @@ async function uploadMany(engine, keys, title) {
   });
 }
 
+// originalOf quita «.conflicto-usuario-fecha» del nombre: la copia de conflicto
+// de «camion.blend» es «camion.conflicto-ana-20261124-1650.blend».
+const originalOf = (path) => path.replace(/\.conflicto-[^/]*?-\d{8}-\d{4}(?=\.[^./]*$|$)/i, '');
+
+async function fileAt(root, path, create = false) {
+  const parts = path.split('/');
+  const name = parts.pop();
+  let dir = root;
+  for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
+  return { dir, name };
+}
+
 const actions = {
+  'check-version': () => checkVersion(true),
   'sync-now': () => syncAll(true),
+  // Usar mi copia de conflicto: reemplaza el original en esta PC con la copia y
+  // la borra. La versión del servidor no se pierde: sigue en su historial.
+  'keep-conflict': (engine, _row, btn) => run(async () => {
+    const copy = btn.dataset.skip;
+    const original = originalOf(copy);
+    if (original === copy) return;
+    if (!confirm(`Tu copia reemplazará a ${original} en esta PC y quedará como «Modificado» para que la subas.\n\nLa versión que está en 3D-Vault no se pierde: queda en su historial.\n\n¿Continuar?`)) return;
+    const from = await fileAt(engine.root, copy);
+    const file = await (await from.dir.getFileHandle(from.name)).getFile();
+    const to = await fileAt(engine.root, original, true);
+    const out = await (await to.dir.getFileHandle(to.name, { create: true })).createWritable();
+    await file.stream().pipeTo(out);
+    await from.dir.removeEntry(from.name);
+    log(`${original}: se usó tu copia de conflicto. Pulsa Subir cambios para llevarla a 3D-Vault.`);
+    notice(`Listo: ${original} tiene tu versión. Bloquéalo y pulsa Subir cambios.`, true);
+    await syncAll(true);
+  }),
   pause: () => {
     ui.paused = !ui.paused;
     render();
     if (!ui.paused) syncAll();
   },
   pick: pickFolder,
-  resume: async () => {
-    if ((await ui.root.requestPermission({ mode: 'readwrite' })) === 'granted') startMain();
-  },
+  resume: () => grantAccess(),
   'cancel-upload': () => $('upload-dialog').close(),
   lock: (engine, row) => run(async () => {
     await engine.lock(row);
@@ -739,7 +978,7 @@ document.addEventListener('click', (e) => {
   if (!fn) return;
   if (!btn.dataset.project) return fn();
   const engine = ui.engines.get(Number(btn.dataset.project));
-  if (!btn.dataset.key) return engine && fn(engine);
+  if (!btn.dataset.key) return engine && fn(engine, undefined, btn);
   const row = engine?.rows.find((r) => r.key === btn.dataset.key);
   if (row) fn(engine, row);
 });
@@ -871,6 +1110,53 @@ document.addEventListener('drop', (e) => {
   })();
 });
 
+// grantAccess consigue el permiso de la carpeta como sea. Primero lo pide; si el
+// navegador lo tiene bloqueado (ya no pregunta), abre el selector en esa misma
+// carpeta: elegirla de nuevo también concede el permiso. Si eligen la misma, se
+// sigue como siempre, sin volver a bajar nada.
+let granting = false;
+async function grantAccess() {
+  if (granting || !ui.root) return;
+  granting = true;
+  try {
+    let state = 'denied';
+    try {
+      state = await ui.root.requestPermission({ mode: 'readwrite' });
+    } catch (err) {
+      diag('permiso-error', `${err.name}: ${err.message}`);
+    }
+    if (state === 'granted') return resumeWith(ui.root);
+    diag('permiso-denegado', state);
+    let picked;
+    try {
+      picked = await showDirectoryPicker({ id: '3dvault', mode: 'readwrite', startIn: ui.root });
+    } catch (err) {
+      if (err.name !== 'AbortError') diag('selector-error', `${err.name}: ${err.message}`);
+      return showDenied();
+    }
+    if (await picked.isSameEntry(ui.root)) return resumeWith(picked);
+    if (!confirm(`Elegiste «${picked.name}», que no es tu carpeta de 3D-Vault («${ui.root.name}»).\n\n¿Usar «${picked.name}» a partir de ahora? Se bajarán ahí tus proyectos.`)) return showDenied();
+    ui.root = picked;
+    ui.engines.clear();
+    await kvSet('root', picked);
+    startMain();
+  } finally {
+    granting = false;
+  }
+}
+
+async function resumeWith(root) {
+  ui.root = root;
+  await kvSet('root', root);
+  startMain();
+}
+
+function showDenied() {
+  show('sync-resume');
+  $('resume-normal').hidden = true;
+  $('resume-denied').hidden = false;
+}
+
 async function pickFolder() {
   try {
     const root = await showDirectoryPicker({ id: '3dvault', mode: 'readwrite' });
@@ -916,6 +1202,52 @@ function startMain() {
   watchFolder();
 }
 
+// En la pantalla de permiso, cualquier clic en la página sirve para pedirlo: el
+// navegador solo deja pedirlo tras un clic, y muchos no veían el botón.
+function askOnFirstClick() {
+  document.title = '(!) Falta permiso · Mi carpeta · 3D-Vault';
+  const ask = async (e) => {
+    if ($('sync-resume').hidden) return document.removeEventListener('click', ask, true); // ya se permitió
+    if (e.target.closest('[data-action], a, nav, input, label')) return; // los botones hacen lo suyo
+    document.removeEventListener('click', ask, true);
+    await grantAccess();
+  };
+  document.addEventListener('click', ask, true);
+}
+
+// checkVersion compara esta página con la versión que entrega el servidor. Si
+// hay una nueva, recarga para usarla (o en cuanto termine lo que está haciendo).
+async function checkVersion(manual = false) {
+  const state = document.querySelector('[data-version-state]');
+  const btn = document.querySelector('[data-action="check-version"]');
+  const say = (text, cls = '') => { if (state) { state.textContent = text; state.className = cls; } };
+  if (btn) btn.disabled = true;
+  say(manual ? 'Buscando…' : '');
+  try {
+    const res = await fetch('/api/version', { cache: 'no-store', headers: { ...ui.api?.headers } });
+    if (!res.ok) throw new Error(`error ${res.status}`);
+    const v = await res.json();
+    const blender = $('blender-version');
+    if (blender) blender.textContent = v.blender || '—';
+    if (!loadedVersion || v.web === loadedVersion) {
+      say('Estás al día.', 'pill pos');
+      if (manual) notice('Mi carpeta está al día: tienes la última versión.', true);
+      return;
+    }
+    markUpdated();
+    if (!ui.busy && !document.querySelector('dialog[open]')) {
+      say('Actualizando…', 'pill warn');
+      location.reload();
+      return;
+    }
+    say('Hay una versión nueva: se actualiza al terminar lo que está haciendo.', 'pill warn');
+  } catch (err) {
+    say('No se pudo comprobar. ¿Hay conexión?', 'pill neg');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 async function main() {
   if (!('showDirectoryPicker' in window)) return show('sync-unsupported');
 
@@ -933,6 +1265,7 @@ async function main() {
   ui.api = new Api(ui.clientId, name);
   try {
     [ui.me, { projects: ui.projects }] = await Promise.all([ui.api.json('GET', '/api/me'), ui.api.json('GET', '/api/projects')]);
+    checkVersion();
   } catch (err) {
     return fail(err);
   }
@@ -941,12 +1274,22 @@ async function main() {
 
   ui.root = await kvGet('root');
   if (!ui.root) return show('sync-setup');
-  if ((await ui.root.queryPermission({ mode: 'readwrite' })) === 'granted') return startMain();
+  const state = await ui.root.queryPermission({ mode: 'readwrite' });
+  if (state === 'granted') return startMain();
   show('sync-resume');
+  if (state === 'denied') return showDenied(); // bloqueado: ya no pregunta solo
+  askOnFirstClick();
 }
 
 setInterval(() => syncAll(), AUTO_EVERY);
-const ready = main();
+// Si algo falla al arrancar, se dice en la página (antes quedaba en blanco) y se
+// anota en el servidor para poder ver qué pasó.
+const ready = main().catch((err) => {
+  diag('error-al-iniciar', `${err?.name}: ${err?.message}`);
+  notice(`Mi carpeta no pudo arrancar en este navegador (${browserName()}): ${err?.message || err}. Prueba recargar la página. Si sigue, avisa al administrador.`);
+});
+addEventListener('error', (e) => diag('error', `${e.message} @ ${e.filename?.split('/').pop()}:${e.lineno}`));
+addEventListener('unhandledrejection', (e) => diag('error', `${e.reason?.name}: ${e.reason?.message || e.reason}`));
 
 // Para pruebas automáticas: permite usar una carpeta sin el selector.
-window.__3dvault = { ui, copyIn, useFolder: async (root) => { await ready; ui.root = root; ui.engines.clear(); startMain(); } };
+window.__3dvault = { ui, copyIn, fail, useFolder: async (root) => { await ready; ui.root = root; ui.engines.clear(); startMain(); } };

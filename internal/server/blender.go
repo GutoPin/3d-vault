@@ -57,16 +57,11 @@ var manifestVersion = regexp.MustCompile(`(?m)^version\s*=\s*"([^"]+)"`)
 // blenderVersion dice qué versión del complemento entrega el servidor, para que
 // el complemento avise si hay una más nueva.
 func (s *Server) blenderVersion(w http.ResponseWriter, r *http.Request) {
-	raw, err := fs.ReadFile(web.Blender, web.BlenderDir+"/blender_manifest.toml")
-	if err != nil {
-		s.webFail(w, r, err)
-		return
-	}
-	m := manifestVersion.FindSubmatch(raw)
-	if m == nil {
+	if blenderAddonVersion == "" {
 		s.webFail(w, r, errors.New("el manifiesto del complemento no tiene versión"))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write(m[1])
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(blenderAddonVersion))
 }

@@ -96,9 +96,15 @@ async function upload(page, path, comment, release = true) {
 const step = (msg) => console.log(`✔ ${msg}`);
 
 // until repite fn, desde Node, hasta que devuelva algo verdadero.
+// Si la página está moviendo o borrando archivos justo al mirar (NotFoundError),
+// se vuelve a mirar.
 async function until(fn, what, timeout = 30000) {
   for (const end = Date.now() + timeout; Date.now() < end; await new Promise((r) => setTimeout(r, 300))) {
-    if (await fn()) return;
+    try {
+      if (await fn()) return;
+    } catch (err) {
+      if (!/NotFoundError|could not be found/.test(String(err))) throw err;
+    }
   }
   throw new Error(`No pasó a tiempo: ${what}`);
 }
@@ -201,6 +207,22 @@ try {
   assert.equal(await b.evaluate(() => readHash('modelos/camion.blend')), await a.evaluate(() => readHash('modelos/camion.blend')));
   step(`Conflicto sin pérdida en B: ${filesB.join(', ')}`);
 
+  // La copia de conflicto no se esconde: Mi carpeta la muestra, la web también, y
+  // «Usar mi copia» la pone en lugar del original para poder subirla.
+  await b.waitForSelector('.skipped-conflicts >> text=/camion\\.conflicto-ana-/');
+  const tabB = await b.context().newPage();
+  await until(async () => { await tabB.goto(`${BASE}/projects/1`); return /Conflicto/.test(await tabB.textContent('body')); }, 'el conflicto se ve en la web');
+  await tabB.close();
+  await b.evaluate(async () => { const { d, name } = await dir('modelos/camion.blend'); window.keep = await (await (await d.getFileHandle(name)).getFile()).arrayBuffer(); });
+  await b.click('.skipped-conflicts button[data-action=keep-conflict]');
+  await waitRow(b, 'modelos/camion.blend', 'changed');
+  assert.ok(!(await b.evaluate(() => list())).some((f) => /conflicto/.test(f)));
+  assert.ok(await b.isHidden('.skipped-conflicts'));
+  await b.evaluate(async () => writeFile('modelos/camion.blend', new Uint8Array(window.keep)));
+  await b.click('[data-action=sync-now]');
+  await waitRow(b, 'modelos/camion.blend', 'ok');
+  step('La copia de conflicto se ve en Mi carpeta y en la web, y «Usar mi copia» la deja lista para subir');
+
   // Borrar en B no se propaga: queda como "No está en tu carpeta" y se recupera.
   await b.evaluate(async () => { const { d, name } = await dir('modelos/camion.blend'); await d.removeEntry(name); });
   await b.click('[data-action=sync-now]');
@@ -240,19 +262,19 @@ try {
   await b.evaluate(async () => { const { d, name } = await dir('texturas/chapa.png'); await d.removeEntry(name); });
   await b.click('[data-action=sync-now]');
   await waitRow(b, 'texturas/chapa.png', 'missing');
-  await b.waitForSelector('#pending-banner:not([hidden]) >> text=1 borrado');
+  await b.waitForSelector('#commit-bar.has-changes button[data-action=upload-all][data-tip*="1 borrado"]');
   assert.ok(await b.evaluate(() => JSON.parse(localStorage.getItem('3dvault-pendientes')).projects[1].borrados === 1));
   const tab = await b.context().newPage();
   await tab.goto(`${BASE}/projects/1`);
   await tab.waitForSelector('#pending-here >> text=1 borrado');
   assert.equal(await tab.textContent('a.nav-item[href="/sync"] .pending-count'), '1');
   await tab.close();
-  await b.click('#pending-banner button[data-action=upload-all]');
+  await b.click('#commit-bar button[data-action=upload-all]');
   await b.waitForSelector('#upload-plan >> text=Se borran en 3D-Vault');
   await b.click('#upload-dialog button[value=ok]');
   await b.waitForFunction(() => /Listo: 1 borrado/.test(document.getElementById('sync-notice').textContent), null, { timeout: 30000 });
   await until(async () => !(await a.evaluate(() => list())).includes('texturas/chapa.png'), 'chapa.png quitada en A');
-  assert.ok(await b.isHidden('#pending-banner'));
+  await b.waitForSelector('#commit-bar:not(.has-changes) >> text=Todo subido');
   step('Un borrado en la PC queda pendiente con aviso y Subir cambios lo confirma en 3D-Vault y en A');
 
   await a.fill('#filter', 'PALA');
@@ -452,6 +474,37 @@ try {
   assert.match(await b.textContent('#status-detail'), /archivos, .* en esta PC\. Revisado a las/);
   assert.match(await b.textContent('#sync-log'), /Camiones: se bajaron \d+ archivos/);
   step('Elegir otra carpeta baja todo de nuevo, sin dar archivos por borrados ni borrar carpetas del servidor');
+
+  // El navegador bloqueó el permiso (ya no pregunta): la página lo dice y «Volver a
+  // preguntar» abre el selector en la misma carpeta, lo que vuelve a dar acceso.
+  await b.evaluate(() => {
+    const P = FileSystemDirectoryHandle.prototype;
+    window.realPerm = [P.queryPermission, P.requestPermission];
+    P.queryPermission = async () => 'denied';
+    P.requestPermission = async () => 'denied';
+    window.showDirectoryPicker = async () => window.__3dvault.ui.root;
+    window.__3dvault.fail(new DOMException('Sin permiso', 'NotAllowedError'));
+  });
+  await b.waitForSelector('#resume-denied:not([hidden])');
+  assert.ok(await b.isHidden('#sync-main'));
+  await b.evaluate(() => { const P = FileSystemDirectoryHandle.prototype; P.requestPermission = async () => 'denied'; });
+  await b.click('#resume-denied button[data-action=resume]');
+  await b.waitForSelector('#sync-main:not([hidden])');
+  await b.evaluate(() => { const P = FileSystemDirectoryHandle.prototype; [P.queryPermission, P.requestPermission] = window.realPerm; });
+  await b.waitForFunction(() => document.getElementById('status-title').textContent === 'Todo al día', null, { timeout: 30000 });
+  assert.equal(await b.evaluate(() => [...window.__3dvault.ui.engines.values()].reduce((n, e) => n + (e.pass?.doneFiles || 0), 0)), 0);
+  step('Con el permiso bloqueado, «Volver a preguntar» elige la misma carpeta y sigue sin volver a bajar nada');
+
+  // «Buscar actualización» compara con el servidor: al día, no recarga.
+  await b.click('[data-action=check-version]');
+  await b.waitForFunction(() => document.querySelector('[data-version-state]').textContent === 'Estás al día.');
+  assert.match(await b.textContent('#blender-version'), /^\d+\.\d+\.\d+$/);
+  step('«Buscar actualización» dice que Mi carpeta está al día y qué complemento de Blender hay');
+
+  // «Lo último que subió el equipo»: quién subió qué y cuándo, para ver si a alguien le falta subir.
+  await b.waitForSelector('#team-uploads:not([hidden])');
+  assert.match(await b.textContent('#team-list'), /subió por última vez hace .*: .*esta semana/);
+  step('Mi carpeta muestra lo último que subió cada persona del equipo');
 
   // El servidor se actualizó: la próxima respuesta trae otra versión y la página se recarga sola.
   let once = true;

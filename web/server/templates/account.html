@@ -69,6 +69,18 @@
   {{end}}
 </div>
 
+<div class="ledger-head" id="programas">
+  <h2>Mis programas</h2>
+  <p>La versión de Mi carpeta y del complemento de Blender en cada PC donde los usas. Si alguno está desactualizado, actualízalo: muchos problemas al subir vienen de una versión vieja.</p>
+</div>
+{{with $d.Versions}}
+{{if .Outdated}}<p class="notice" role="status">{{plural .Outdated "programa desactualizado" "programas desactualizados"}}. Mi carpeta: recarga la página en esa PC (F5). Blender: descarga el complemento e instálalo encima del que tienes.</p>{{end}}
+<div class="panel table-panel">
+  {{if .Clients}}{{template "clients" (dict "Clients" .Clients "Admin" false)}}
+  {{else}}<p class="empty">Aún no hay programas anotados. Aparecen al abrir Mi carpeta o usar el panel de Blender.</p>{{end}}
+</div>
+{{end}}
+
 <section class="settings-row">
   <div>
     <h2>Cambiar mi contraseña</h2>

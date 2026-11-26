@@ -48,9 +48,17 @@ func loadPages() (*pageSet, error) {
 		"when":          func(t time.Time) string { return formatWhen(t, time.Now()) },
 		"linkKind":      linkKind,
 		"plural":        plural,
+		"appVersion":    func() string { return appVersion },
+		"dict": func(kv ...any) map[string]any {
+			m := make(map[string]any, len(kv)/2)
+			for i := 0; i+1 < len(kv); i += 2 {
+				m[fmt.Sprint(kv[i])] = kv[i+1]
+			}
+			return m
+		},
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide", "trash"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide", "trash", "versions"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -256,6 +264,7 @@ func (s *Server) webRoutes(r chi.Router) {
 			r.Post("/admin/users/password", s.webSetPassword)
 			r.Get("/admin/storage", s.webStorage)
 			r.Get("/admin/locks", s.webLocks)
+			r.Get("/admin/versiones", s.webVersions)
 			r.Post("/admin/locks/{id}/unlock", s.webForceUnlock)
 		})
 	})
@@ -443,6 +452,8 @@ type treeRow struct {
 	Links vault.LinkSummary
 	// Empty marca una carpeta sin archivos, que se puede borrar.
 	Empty bool
+	// Pending son los cambios sin subir de este archivo en las PCs.
+	Pending []pendingMark
 }
 
 type projectData struct {
@@ -455,6 +466,10 @@ type projectData struct {
 	EmptyMessage string
 	HasFiles     bool
 	HasFolders   bool
+	// PendingPCs son las PCs con cambios sin subir en este proyecto.
+	PendingPCs []pendingPC
+	// MinePending dice si alguna PC tuya tiene cambios sin subir aquí.
+	MinePending bool
 }
 
 func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
@@ -554,6 +569,22 @@ func (s *Server) webProject(w http.ResponseWriter, r *http.Request) {
 		data.Rows = buildTree(shown, snap.Folders, links)
 	}
 	data.HasFolders = len(snap.Folders) > 0
+
+	// Lo que cada PC cambió y aún no subió, con colores como en git.
+	assetPaths := make(map[string]bool, len(snap.Assets))
+	for _, asset := range snap.Assets {
+		assetPaths[strings.ToLower(asset.Path)] = true
+	}
+	pcs, byPath := s.pendingView(id, assetPaths, user.ID)
+	data.PendingPCs = pcs
+	for _, pc := range pcs {
+		data.MinePending = data.MinePending || pc.Mine
+	}
+	for i := range data.Rows {
+		if !data.Rows[i].Folder {
+			data.Rows[i].Pending = byPath[strings.ToLower(data.Rows[i].Asset.Path)]
+		}
+	}
 	// La pestaña de enlaces rotos solo aparece si hay alguno, o si está elegida.
 	if len(broken) > 0 || state == stateBroken {
 		data.Tabs = append(data.Tabs, tabData{Label: "Con enlaces rotos", Href: tabHref(stateBroken), Count: len(broken), Selected: state == stateBroken})

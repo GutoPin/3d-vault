@@ -6,10 +6,10 @@
     <p class="sub">{{.Data.Summary}}</p>
   </div>
   <div class="actions">
-    <button class="btn" type="button" data-page-new-folder="">Nueva carpeta</button>
-    <a class="btn" href="/activity?project={{.Data.Project.ID}}">Actividad</a>
-    <a class="btn" href="/projects/{{.Data.Project.ID}}/papelera">Papelera</a>
-    {{if not .Data.Project.Archived}}<button class="btn" type="button" popovertarget="borrar-proyecto">Borrar proyecto</button>{{end}}
+    <button class="btn" type="button" data-page-new-folder="" data-tip="Crea una carpeta vacía en el proyecto. Aparece en la PC de todos.">Nueva carpeta</button>
+    <a class="btn" href="/activity?project={{.Data.Project.ID}}" data-tip="Historial de este proyecto: quién subió, bloqueó o borró qué">Actividad</a>
+    <a class="btn" href="/projects/{{.Data.Project.ID}}/papelera" data-tip="Archivos borrados de este proyecto. Desde aquí se recuperan.">Papelera</a>
+    {{if not .Data.Project.Archived}}<button class="btn" type="button" popovertarget="borrar-proyecto" data-tip="Lo quita de la lista y de Mi carpeta. Se puede recuperar.">Borrar proyecto</button>{{end}}
     {{if .Data.HasFiles}}<a class="btn" href="/projects/{{.Data.Project.ID}}/download.zip" title="La última versión de cada archivo, con sus carpetas">Descargar todo (.zip)</a>{{end}}
   </div>
 </div>
@@ -32,6 +32,26 @@
 </div>
 {{end}}
 
+{{with .Data.PendingPCs}}
+<section class="panel pending-pcs" aria-labelledby="pending-title">
+  <div class="pending-head">
+    <h2 id="pending-title">Cambios en las PCs, aún sin subir</h2>
+    <p class="sub">Lo que cada modelador tiene distinto en su carpeta y todavía no está en 3D-Vault. Se actualiza solo mientras tienen <b>Mi carpeta</b> abierta.</p>
+    {{template "git-legend"}}
+  </div>
+  {{range .}}
+  <details class="pending-pc"{{if le (len .Marks) 8}} open{{end}}>
+    <summary><b>{{if .Mine}}Tú{{else}}{{.Who}}{{end}}</b> <span class="sub">en {{.ClientName}} · {{.Ago}}</span>{{range .Counts}} <span class="pill git {{.Class}}"><span class="git-mark" aria-hidden="true">{{.Mark}}</span>{{.Label}}</span>{{end}}</summary>
+    <ul class="pending-list">
+      {{range .Marks}}<li><span class="pill git {{.Class}}" data-tip="{{.Hint}}"><span class="git-mark" aria-hidden="true">{{.Mark}}</span>{{.Label}}</span> <span class="path">{{.Path}}</span></li>{{end}}
+    </ul>
+  </details>
+  {{end}}
+</section>
+{{end}}
+
+{{if not .Data.MinePending}}<p class="sync-hint">¿Copiaste archivos a tu carpeta y no salen aquí? Copiarlos no los sube: abre <a href="/sync">Mi carpeta</a>, pulsa <b>Permitir y sincronizar</b> si te lo pide, y luego <b>Subir cambios</b>. También puedes subirlos abajo, en <a href="#agregar">Agregar archivos o carpetas</a>.</p>{{end}}
+
 <div id="asset-list">
   <nav class="tabs" aria-label="Filtrar archivos">
     {{range .Data.Tabs}}<a href="{{.Href}}"{{if .Selected}} aria-selected="true"{{end}}>{{.Label}}<span>{{.Count}}</span></a>{{end}}
@@ -50,14 +70,14 @@
       {{if .Data.Rows}}
       <div class="table-wrap">
         <table class="stack-table tree-table">
-          <thead><tr><th>Archivo</th><th class="n col-version">Versión</th><th class="n col-size">Tamaño</th><th class="col-lock">Bloqueo</th><th class="n col-date">Última subida</th></tr></thead>
+          <thead><tr><th>Archivo</th><th class="n col-version" data-tip="Cuántas veces se ha subido. La más alta es la actual.">Versión</th><th class="n col-size">Tamaño</th><th class="col-lock" data-tip="Quién lo está editando. Si está bloqueado, nadie más puede subir encima.">Bloqueo</th><th class="n col-date" data-tip="Cuándo y quién subió la última versión">Última subida</th></tr></thead>
           <tbody>
           {{range .Data.Rows}}
             {{if .Folder}}
             <tr class="folder"><td colspan="5"><span class="tree-cell d{{.Depth}}"><span>{{.Name}}/</span> {{if not .Empty}}<a class="text-action folder-zip" href="/projects/{{$.Data.Project.ID}}/download.zip?prefix={{.Prefix}}" aria-label="Descargar la carpeta {{.Name}} (.zip)">Descargar .zip</a>{{end}} <button class="text-action folder-zip" type="button" data-upload-here="{{.Prefix}}" aria-label="Agregar archivos a la carpeta {{.Name}}">Agregar aquí</button> <button class="text-action folder-zip" type="button" data-page-new-folder="{{.Prefix}}" aria-label="Nueva carpeta dentro de {{.Name}}">Nueva carpeta</button> <button class="text-action folder-zip" type="button" data-rename-folder="{{.Prefix}}" aria-label="Cambiar el nombre de la carpeta {{.Name}}">Renombrar</button> <button class="text-action folder-zip" type="button" data-delete-folder="{{.Prefix}}" aria-label="Borrar la carpeta {{.Name}}">Borrar</button>{{if .Empty}} <span class="pill">Vacía</span>{{end}}</span></td></tr>
             {{else}}
             <tr>
-              <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a>{{with .Links}}{{if .Broken}}<span class="pill warn link-mark" title="Usa archivos que en otras PCs no se encontrarán">{{plural .Broken "enlace roto" "enlaces rotos"}}</span>{{end}}{{if .UsedBy}}<span class="pill link-mark" title="Otros .blend enlazan este archivo">Lo usan {{.UsedBy}}</span>{{end}}{{end}}</span></td>
+              <td><span class="tree-cell d{{.Depth}}"><a class="name" href="/assets/{{.Asset.ID}}">{{.Name}}</a>{{with .Links}}{{if .Broken}}<span class="pill warn link-mark" data-tip="Usa archivos que en otras PCs no se encontrarán">{{plural .Broken "enlace roto" "enlaces rotos"}}</span>{{end}}{{if .UsedBy}}<span class="pill link-mark" data-tip="Otros .blend enlazan este archivo">Lo usan {{.UsedBy}}</span>{{end}}{{end}}{{range .Pending}}<span class="pill git link-mark {{.Class}}" data-tip="{{.Who}}: {{.Hint}}"><span class="git-mark" aria-hidden="true">{{.Mark}}</span>{{.Label}} por {{.Who}}</span>{{end}}</span></td>
               <td class="n" data-label="Versión:">v{{.Asset.HeadVersion}}</td>
               <td class="n" data-label="Tamaño:">{{formatBytes .Asset.SizeBytes}}</td>
               <td>{{template "lock-mark" .Asset.Lock}}</td>
@@ -84,8 +104,8 @@
     <div class="field wide">
       <span class="label-like">Qué subir</span>
       <div class="pick-row">
-        <label class="btn" for="file">Elegir archivos</label>
-        <label class="btn" for="dir">Elegir una carpeta</label>
+        <label class="btn" for="file" data-tip="Sube uno o varios archivos sueltos">Elegir archivos</label>
+        <label class="btn" for="dir" data-tip="Sube una carpeta completa con sus subcarpetas, como texturas y enlaces">Elegir una carpeta</label>
         <span class="sub" data-picked>Nada elegido. También puedes arrastrar archivos o carpetas aquí.</span>
       </div>
       <input class="visually-hidden" id="file" name="file" type="file" multiple>
@@ -101,3 +121,5 @@
 {{end}}
 
 {{define "lock-mark"}}{{if .}}<span class="lock-mark"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>{{.DisplayName}}</span>{{else}}<span class="free">Libre</span>{{end}}{{end}}
+
+{{define "git-legend"}}<p class="git-legend" aria-label="Qué significa cada color"><span class="pill git add"><span class="git-mark" aria-hidden="true">+</span>Nuevo</span> <span class="pill git mod"><span class="git-mark" aria-hidden="true">~</span>Modificado</span> <span class="pill git del"><span class="git-mark" aria-hidden="true">−</span>Borrado</span> <span class="pill git mov"><span class="git-mark" aria-hidden="true">→</span>Movido</span></p>{{end}}

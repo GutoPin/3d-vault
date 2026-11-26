@@ -5,8 +5,8 @@
     <p class="sub" id="sync-summary">Tus proyectos en una carpeta de esta PC, siempre al día.</p>
   </div>
   <div class="actions" id="sync-actions" hidden>
-    <button class="btn" type="button" data-action="pause" id="pause-btn">Pausar</button>
-    <button class="btn primary" type="button" data-action="sync-now" id="sync-now">Sincronizar ahora</button>
+    <button class="btn" type="button" data-action="pause" id="pause-btn" data-tip="Deja de bajar y revisar cambios hasta que pulses Reanudar. Útil si la conexión va lenta.">Pausar</button>
+    <button class="btn primary" type="button" data-action="sync-now" id="sync-now" data-tip="Revisa ahora mismo tu carpeta y el servidor. Solo baja lo que te falta o cambió: no vuelve a bajar todo.">Sincronizar ahora</button>
   </div>
 </div>
 
@@ -26,11 +26,12 @@
 <section class="panel" id="sync-unsupported" hidden>
   <h2>Abre esta página en Microsoft Edge o Google Chrome</h2>
   <p class="sub">Este navegador no permite trabajar con una carpeta de la PC. Edge viene instalado en Windows. Mientras tanto puedes descargar cada versión desde la ficha del archivo.</p>
+  <p class="sub">Navegador detectado: <b id="browser-name"></b>. Mi carpeta solo funciona en Edge o Chrome <b>de computadora</b>: no en el celular, ni en Brave, Firefox o Safari.</p>
 </section>
 
-<section class="panel" id="sync-other-tab" hidden>
-  <h2>Ya está abierta en otra pestaña</h2>
-  <p class="sub">Solo una pestaña sincroniza a la vez. Ciérrala o usa esa.</p>
+<section class="panel resume-call" id="sync-other-tab" hidden>
+  <h2>Mi carpeta ya está abierta en otra ventana</h2>
+  <p>Solo una ventana sincroniza a la vez, así que aquí no se muestra nada. Busca la otra pestaña, o la ventana de 3D-Vault si la instalaste como aplicación, y usa esa. Si no la encuentras, cierra el navegador entero y vuelve a abrir esta página.</p>
 </section>
 
 <section class="settings-row" id="sync-setup" hidden>
@@ -48,22 +49,36 @@
   </div>
 </section>
 
-<section class="settings-row" id="sync-resume" hidden>
-  <div>
-    <h2>Permite el acceso a tu carpeta</h2>
-    <p>El navegador vuelve a preguntar cada vez que abres la página. Si te ofrece <b>Permitir siempre</b>, elígelo.</p>
+<section class="panel resume-call" id="sync-resume" hidden>
+  <div id="resume-normal">
+  <h2>Falta un clic: permite el acceso a tu carpeta</h2>
+  <p><span id="resume-folder-line">Carpeta: <b id="resume-folder"></b>. </span>Por seguridad, el navegador vuelve a pedir permiso cada vez que se abre o se recarga esta página. <b>Hasta que lo permitas no se ven tus archivos, no se sincroniza nada y no aparece el botón Subir cambios.</b></p>
+  <ol class="steps">
+    <li>Pulsa <b>Permitir y sincronizar</b>.</li>
+    <li>En el aviso del navegador elige <b>Permitir en cada visita</b> (o <b>Permitir siempre</b>) para que no vuelva a preguntar.</li>
+  </ol>
+  <div class="form-foot">
+    <button class="btn" type="button" data-action="pick" data-tip="Usar otra carpeta de esta PC para 3D-Vault">Elegir otra carpeta</button>
+    <button class="btn primary big" type="button" data-action="resume" id="resume-btn" data-tip="Pide el permiso al navegador. Si lo tiene bloqueado, te deja elegir la carpeta otra vez, que también lo concede.">Permitir y sincronizar</button>
   </div>
-  <div class="panel form-foot">
-    <button class="btn" type="button" data-action="pick">Elegir otra carpeta</button>
-    <button class="btn primary" type="button" data-action="resume">Permitir y sincronizar</button>
+  </div>
+  <div id="resume-denied" role="alert" hidden>
+    <h3>El navegador tiene bloqueado el acceso a la carpeta</h3>
+    <p>Por eso no vuelve a preguntar. Tienes dos opciones:</p>
+    <ol class="steps">
+      <li>Pulsa <b>Volver a preguntar</b>: se abrirá el selector de carpetas. Elige <b>la misma carpeta</b>, <span data-folder-name></span>, y acepta <b>Ver archivos</b> y <b>Guardar cambios</b>.</li>
+      <li>Si el selector tampoco aparece: haz clic en el <b>candado</b> (o el ícono de ajustes) a la izquierda de la dirección de la página → <b>Permisos del sitio</b> o <b>Configuración del sitio</b> → busca <b>Editar archivos</b> y cámbialo a <b>Preguntar</b>. Después recarga la página.</li>
+    </ol>
+    <div class="form-foot"><button class="btn" type="button" data-action="pick">Elegir otra carpeta</button><button class="btn primary big" type="button" data-action="resume">Volver a preguntar</button></div>
   </div>
 </section>
 
 <div id="sync-main" hidden>
+  <section class="panel commit-bar" id="commit-bar" aria-live="polite"></section>
   <section class="settings-row">
     <div>
       <h2>Proyectos en esta PC</h2>
-      <p>Carpeta: <b id="root-name"></b>. <button class="text-action" type="button" data-action="pick">Cambiar</button></p>
+      <p>Carpeta: <b id="root-name"></b>. <button class="text-action" type="button" data-action="pick" data-tip="Usar otra carpeta de esta PC para 3D-Vault">Cambiar</button></p>
     </div>
     <div class="panel check-list" id="project-picks"></div>
   </section>
@@ -72,9 +87,23 @@
     <form role="search" id="filter-form">
       <input class="input" id="filter" type="search" placeholder="Buscar archivo en mis proyectos" aria-label="Buscar archivo">
     </form>
-    <label class="check"><input type="checkbox" id="only-pending"> Solo lo que necesita algo de mí</label>
+    <label class="check" data-tip="Oculta lo que está al día y deja solo lo nuevo, modificado, borrado o con error"><input type="checkbox" id="only-pending"> Solo lo que necesita algo de mí</label>
   </div>
+  <p class="sync-legend" aria-label="Qué significa cada color">Colores:
+    <span class="pill git add" data-tip="Está en tu carpeta pero no en 3D-Vault"><span class="git-mark" aria-hidden="true">+</span>Nuevo</span>
+    <span class="pill git mod" data-tip="Lo cambiaste en tu PC y no lo subiste"><span class="git-mark" aria-hidden="true">~</span>Modificado</span>
+    <span class="pill git del" data-tip="Lo borraste en tu PC y no confirmaste el borrado"><span class="git-mark" aria-hidden="true">−</span>Borrado</span>
+    <span class="pill git mov" data-tip="Lo renombraste o moviste en tu PC"><span class="git-mark" aria-hidden="true">→</span>Movido</span>
+    · Los demás ven estos cambios en la página del proyecto, pero no reciben el archivo hasta que lo subas.</p>
   <div id="project-tables"></div>
+
+  <section id="team-uploads" hidden>
+    <div class="ledger-head">
+      <h2>Lo último que subió el equipo</h2>
+      <p>Lo que alguien guarda en su PC no llega a los demás hasta que pulsa <b>Subir cambios</b>. Si alguien no aparece aquí o su última subida es vieja, su trabajo sigue en su PC. Lo que tiene sin subir se ve en la página del proyecto.</p>
+    </div>
+    <div class="panel"><ul class="team-list" id="team-list"></ul></div>
+  </section>
 
   <div class="ledger-head">
     <h2>Actividad de esta sesión</h2>
@@ -88,18 +117,24 @@
       <p>Para no tener que acordarte de abrir esta página.</p>
     </div>
     <div class="panel comforts">
+      <div class="comfort" id="version-box"><div>
+        <b>Versión</b>
+        <p class="sub">Mi carpeta <code id="web-version">{{slice appVersion 0 7}}</code> · complemento de Blender disponible <code id="blender-version">—</code>. <span data-version-state></span></p>
+        <p class="sub">Mi carpeta se actualiza sola, pero una ventana abierta hace días puede tener código viejo. La versión de cada PC está en <a class="text-action" href="/account#programas">Mi cuenta → Mis programas</a>.</p>
+      </div>
+      <button class="btn" type="button" data-action="check-version" data-tip="Compara esta ventana con la última versión y, si hay una nueva, la carga. No se pierde nada: lo que está a medias termina antes">Buscar actualización</button></div>
       <div class="comfort"><div>
         <b>Instalar como aplicación</b>
         <p class="sub">Tendrá su propia ventana e ícono en la barra de tareas. Después, en Edge abre <b>edge://apps</b>, haz clic derecho sobre 3D-Vault y marca <b>Iniciar automáticamente al iniciar sesión</b>: así se sincroniza desde que enciendes la PC.</p>
         <p class="sub" id="install-how">Si no ves el botón: menú <b>⋯</b> del navegador → <b>Aplicaciones</b> → <b>Instalar este sitio como aplicación</b>.</p>
         <p class="sub" id="install-done" hidden>Ya la estás usando como aplicación.</p>
       </div>
-      <button class="btn" type="button" data-action="install" id="install-btn" hidden>Instalar</button></div>
+      <button class="btn" type="button" data-action="install" id="install-btn" data-tip="Abre 3D-Vault en su propia ventana, como un programa más" hidden>Instalar</button></div>
       <div class="comfort"><div>
         <b>Avisos de escritorio</b>
         <p class="sub">Te avisa cuando llega una versión nueva o hay un conflicto, aunque estés en Blender. <span id="notify-state"></span></p>
       </div>
-      <button class="btn" type="button" data-action="notify" id="notify-btn" hidden>Activar avisos</button></div>
+      <button class="btn" type="button" data-action="notify" id="notify-btn" data-tip="El navegador te pedirá permiso para mostrar avisos" hidden>Activar avisos</button></div>
       <div class="comfort" id="blender"><div>
         <b>Conectar Blender</b>
         <p class="sub">Un panel dentro de Blender (tecla N → 3D-Vault) para bloquear, guardar y subir, y actualizar, sin salir de Blender. Te avisa al abrir un archivo si hay una versión más nueva o lo tiene otro.</p>
@@ -113,7 +148,7 @@
           <button class="btn" type="button" data-action="copy-code">Copiar</button>
         </div>
       </div>
-      <button class="btn" type="button" data-action="blender-code">Generar código</button></div>
+      <button class="btn" type="button" data-action="blender-code" data-tip="Crea un código para conectar Blender con tu cuenta. Se pega una sola vez.">Generar código</button></div>
     </div>
   </section>
 
@@ -138,7 +173,7 @@
       <textarea class="input" id="upload-comment" rows="3" minlength="3" maxlength="500" required></textarea>
     </div>
     <div class="wide" id="upload-plan"></div>
-    <label class="check wide" id="upload-release-row"><input type="checkbox" id="upload-release" checked> Liberar el bloqueo al terminar</label>
+    <label class="check wide" id="upload-release-row" data-tip="Al terminar de subir, el archivo queda libre para que otro lo edite"><input type="checkbox" id="upload-release" checked> Liberar el bloqueo al terminar</label>
     <div class="wide form-foot">
       <button class="btn ghost" type="button" data-action="cancel-upload">Cancelar</button>
       <button class="btn primary" type="submit" value="ok">Subir</button>

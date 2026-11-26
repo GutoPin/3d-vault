@@ -527,13 +527,57 @@ class THREEDVAULT_OT_uncompress(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def install_addon(path):
+    """Instala el .zip encima del complemento actual. Devuelve un error o None."""
+    parts = __package__.split(".")
+    if len(parts) == 3 and parts[0] == "bl_ext":  # instalado como extensión (Blender 4.2+)
+        try:
+            try:
+                bpy.ops.extensions.package_install_files(filepath=path, repo=parts[1], enable_on_install=True, overwrite=True)
+            except TypeError:
+                bpy.ops.extensions.package_install_files(filepath=path, repo=parts[1], enable_on_install=True)
+            return None
+        except Exception as err:  # noqa: BLE001: se ofrece instalarlo a mano
+            traceback.print_exc()
+            return str(err)
+    return "Este Blender no permite actualizarlo solo."
+
+
 class THREEDVAULT_OT_get_addon(bpy.types.Operator):
     bl_idname = "three_d_vault.get_addon"
-    bl_label = "Descargar la versión nueva"
-    bl_description = "Bajar la versión nueva del complemento. Luego instálala igual que la primera vez"
+    bl_label = "Actualizar complemento"
+    bl_description = "Bajar la versión nueva del complemento desde 3D-Vault e instalarla encima de esta. No hace falta volver a pegar el código"
 
     def execute(self, _context):
-        bpy.ops.wm.url_open(url=vault.parse_code(prefs().code)["server"] + "/blender/3dvault.zip")
+        dest = os.path.join(tempfile.gettempdir(), "3dvault-blender.zip")
+
+        def done(path):
+            err = install_addon(path)
+            if err:
+                STATE["error"] = ("No se pudo instalar solo (" + err + "). Se abrió la descarga: en Editar → Preferencias → "
+                                  "Complementos, menú ⌄ → Instalar desde el disco, elige 3dvault-blender.zip.")
+                bpy.ops.wm.url_open(url=vault.parse_code(prefs().code)["server"] + "/blender/3dvault.zip")
+                return
+            STATE["addon_update"] = ""
+            STATE["notice"] = "Complemento actualizado. Si algo se ve raro, reinicia Blender."
+            popup("3D-Vault", ["Complemento actualizado.", "Si algo se ve raro, reinicia Blender."])
+
+        run_job("Bajando el complemento", lambda: get_vault().download_addon(dest), done)
+        return {"FINISHED"}
+
+
+class THREEDVAULT_OT_check_addon(bpy.types.Operator):
+    bl_idname = "three_d_vault.check_addon"
+    bl_label = "Buscar actualización"
+    bl_description = "Preguntar a 3D-Vault si hay una versión nueva del complemento"
+
+    def execute(self, _context):
+        def done(newer):
+            STATE["addon_update"] = newer or ""
+            STATE["notice"] = (f"Hay una versión nueva: {newer}. Pulsa Actualizar complemento." if newer
+                               else f"Tienes la última versión ({vault.own_version()}).")
+
+        run_job("Buscando actualización", lambda: get_vault().addon_update(), done)
         return {"FINISHED"}
 
 
@@ -899,8 +943,12 @@ class THREEDVAULT_Preferences(bpy.types.AddonPreferences):
         layout.prop(self, "code")
         row = layout.row()
         row.operator("three_d_vault.test_connection", icon="LINKED")
+        row.operator("three_d_vault.check_addon", icon="FILE_REFRESH")
+        if STATE.get("addon_update"):
+            row.operator("three_d_vault.get_addon", icon="IMPORT")
         if STATE["notice"] or STATE["error"]:
-            row.label(text=STATE["error"] or STATE["notice"])
+            wrapped(layout, STATE["error"] or STATE["notice"], width=90)
+        layout.label(text=f"Versión instalada: {vault.own_version()}")
         if not bpy.app.online_access:
             wrapped(layout, "Activa Permitir acceso en línea en Preferencias → Sistema → Red.", "ERROR", 90)
 
@@ -925,7 +973,7 @@ def on_save(_dummy):
 CLASSES = (
     THREEDVAULT_OT_refresh, THREEDVAULT_OT_lock, THREEDVAULT_OT_unlock, THREEDVAULT_OT_upload,
     THREEDVAULT_OT_update, THREEDVAULT_OT_uncompress, THREEDVAULT_OT_open_web, THREEDVAULT_OT_test, THREEDVAULT_OT_request,
-    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_OT_fix_textures,
+    THREEDVAULT_OT_open_version, THREEDVAULT_OT_get_addon, THREEDVAULT_OT_check_addon, THREEDVAULT_OT_fix_textures,
     THREEDVAULT_OT_reload_library, THREEDVAULT_OT_update_library, THREEDVAULT_OT_upload_library,
     THREEDVAULT_OT_open_library, THREEDVAULT_OT_link_from_project,
     THREEDVAULT_PT_panel, THREEDVAULT_PT_links, THREEDVAULT_PT_versions,

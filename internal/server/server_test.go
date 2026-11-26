@@ -132,6 +132,7 @@ type apiCall struct {
 	clientID string
 	body     any
 	raw      []byte
+	headers  map[string]string
 }
 
 func (e *env) do(call apiCall) *http.Response {
@@ -156,6 +157,9 @@ func (e *env) do(call apiCall) *http.Response {
 	}
 	if call.clientID != "" {
 		req.Header.Set("X-Client-Id", call.clientID)
+	}
+	for k, v := range call.headers {
+		req.Header.Set(k, v)
 	}
 	resp, err := e.server.Client().Do(req)
 	if err != nil {

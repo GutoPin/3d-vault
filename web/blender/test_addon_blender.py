@@ -279,7 +279,7 @@ def run(data):
     vault.own_version = lambda: "0.9.0"
     st["addon_update"] = None
     addon.refresh()
-    assert st["addon_update"] == "1.2.0", st["addon_update"]
+    assert st["addon_update"] == "1.3.0", st["addon_update"]
     assert "[three_d_vault.get_addon]" in draw_panels()
     step("Avisa cuando el servidor tiene una versión más nueva del complemento")
 

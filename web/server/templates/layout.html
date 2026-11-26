@@ -1,4 +1,23 @@
 {{define "brand"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path class="cube-face" d="M12 12.5 20 8v8.8l-8 4.7z"/><path class="cube-edge" d="M12 2.8 20 8v8.8l-8 4.7-8-4.7V8zM4 8l8 4.5L20 8M12 12.5v9"/></svg>{{end -}}
+{{define "clients"}}{{$admin := .Admin}}
+<div class="table-wrap">
+  <table class="stack-table versions-table">
+    <thead><tr>{{if $admin}}<th>Persona</th>{{end}}<th>Programa</th><th>PC</th><th>Versión</th><th class="n">Visto</th><th></th></tr></thead>
+    <tbody>
+    {{range .Clients}}
+      <tr{{if not .Current}} class="outdated"{{end}}>
+        {{if $admin}}<td><span class="name">{{.Who}}</span></td>{{end}}
+        <td><span class="name">{{.AppLabel}}</span><span class="sub">{{.Browser}}</span></td>
+        <td data-label="PC:">{{.PC}}</td>
+        <td data-label="Versión:"><code>{{.Version}}</code> {{if .Current}}<span class="pill pos" data-tip="Tiene la última versión">Al día</span>{{else}}<span class="pill warn" data-tip="{{.Hint}}">Desactualizado</span>{{end}}</td>
+        <td class="n" data-label="Visto:">{{.Ago}}</td>
+        <td class="row-actions">{{if not .Current}}{{if eq .App "blender"}}<a class="text-action" href="/blender/3dvault.zip" data-tip="Baja el complemento nuevo. En Blender: Editar → Preferencias → Complementos → ⌄ → Instalar desde el disco">Descargar complemento</a>{{else}}<a class="text-action" href="/sync" data-tip="En esa PC, abre Mi carpeta y recarga la página (F5)">Abrir Mi carpeta</a>{{end}}{{end}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end -}}
 <!doctype html>
 <html lang="es">
 <head>
@@ -8,11 +27,13 @@
 <title>{{.Title}} · 3D-Vault</title>
 <link rel="icon" href="/static/app/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="/static/app/manifest.json">
+<meta name="app-version" content="{{appVersion}}">
 <meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
 <script type="module" src="/static/sidebar.js"></script>
+<script type="module" src="/static/tips.js"></script>
 </head>
 <body>
 {{if .User -}}
@@ -26,11 +47,11 @@
     <label class="btn ghost close-menu" for="menu">Cerrar</label>
     <a class="brand" href="/">{{template "brand"}}3D-Vault</a>
     <form class="side-search" method="get" action="/search" role="search"><input class="input" type="search" name="q" placeholder="Buscar archivos" aria-label="Buscar archivos en todos los proyectos"></form>
-    <a class="nav-item" href="/sync"{{if eq .Active "sync"}} aria-current="page"{{end}}>Mi carpeta</a>
-    <a class="nav-item" href="/activity"{{if eq .Active "activity"}} aria-current="page"{{end}}>Actividad</a>
-    <a class="nav-item" href="/guia"{{if eq .Active "guide"}} aria-current="page"{{end}}>Guía</a>
+    <a class="nav-item" data-tip="Tu carpeta en esta PC: baja lo nuevo de los demás y te dice qué tienes sin subir" href="/sync"{{if eq .Active "sync"}} aria-current="page"{{end}}>Mi carpeta</a>
+    <a class="nav-item" data-tip="Quién subió, bloqueó o borró qué, y cuándo" href="/activity"{{if eq .Active "activity"}} aria-current="page"{{end}}>Actividad</a>
+    <a class="nav-item" data-tip="Paso a paso de cómo trabajar con 3D-Vault" href="/guia"{{if eq .Active "guide"}} aria-current="page"{{end}}>Guía</a>
     <div class="group-label">Proyectos</div>
-    <a class="nav-item" href="/"{{if eq .Active "projects"}} aria-current="page"{{end}}>Todos los proyectos</a>
+    <a class="nav-item" data-tip="La lista de proyectos, y crear uno nuevo" href="/"{{if eq .Active "projects"}} aria-current="page"{{end}}>Todos los proyectos</a>
     {{range .Projects}}<div class="nav-project" data-project="{{.ID}}"{{if eq $.ActiveProject .ID}} data-active{{end}}>
       <div class="nav-row">
         <button class="tree-twisty" type="button" aria-expanded="false" aria-controls="arbol-{{.ID}}" aria-label="Ver las carpetas de {{.Name}}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
@@ -42,11 +63,12 @@
     {{end}}
     {{if .User.IsAdmin}}<div class="group-label">Administración</div>
     <a class="nav-item" href="/admin/users"{{if eq .Active "users"}} aria-current="page"{{end}}>Usuarios</a>
-    <a class="nav-item" href="/admin/locks"{{if eq .Active "locks"}} aria-current="page"{{end}}>Bloqueos</a>
-    <a class="nav-item" href="/admin/storage"{{if eq .Active "storage"}} aria-current="page"{{end}}>Espacio</a>{{end}}
+    <a class="nav-item" data-tip="Todos los archivos bloqueados y desde cuándo" href="/admin/locks"{{if eq .Active "locks"}} aria-current="page"{{end}}>Bloqueos</a>
+    <a class="nav-item" data-tip="Qué versión de Mi carpeta y del complemento de Blender tiene cada PC" href="/admin/versiones"{{if eq .Active "versions"}} aria-current="page"{{end}}>Versiones</a>
+    <a class="nav-item" data-tip="Cuánto disco ocupa cada proyecto y cómo liberar espacio" href="/admin/storage"{{if eq .Active "storage"}} aria-current="page"{{end}}>Espacio</a>{{end}}
     <div class="bottom user-row">
       <a class="who" href="/account"{{if eq .Active "account"}} aria-current="page"{{end}}>{{.User.DisplayName}}<span>Mi cuenta</span></a>
-      <form method="post" action="/logout"><button class="btn" type="submit">Salir</button></form>
+      <form method="post" action="/logout"><button class="btn" type="submit" data-tip="Cerrar la sesión en este navegador">Salir</button></form>
     </div>
   </nav>
   <main class="canvas">

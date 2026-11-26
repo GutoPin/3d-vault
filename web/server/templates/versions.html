@@ -1,0 +1,18 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="title-row">
+  <div>
+    <h1>Versiones</h1>
+    <p class="sub">Qué versión de Mi carpeta y del complemento de Blender usa cada PC, según la última vez que habló con el servidor. La versión actual es <code>{{$d.WebVersion}}</code> para Mi carpeta y <code>{{$d.BlenderVersion}}</code> para el complemento.</p>
+  </div>
+  <a class="btn" href="/admin/versiones" data-tip="Vuelve a leer la lista. Cada PC avisa su versión al usarla">Comprobar de nuevo</a>
+</div>
+
+{{if $d.Outdated}}<p class="notice" role="status">{{plural $d.Outdated "programa desactualizado" "programas desactualizados"}}. Mi carpeta se actualiza sola al recargar la página. El complemento de Blender hay que instalarlo de nuevo una vez: después se actualiza con un botón desde Blender.</p>
+{{else if $d.Clients}}<p class="notice ok" role="status">Todas las PCs tienen la última versión.</p>{{end}}
+
+<div class="panel table-panel">
+  {{if $d.Clients}}{{template "clients" (dict "Clients" $d.Clients "Admin" true)}}
+  {{else}}<p class="empty">Aún ninguna PC avisó su versión. Aparecen al abrir Mi carpeta o usar el panel de Blender.</p>{{end}}
+</div>
+{{end}}

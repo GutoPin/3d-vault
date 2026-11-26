@@ -54,6 +54,9 @@ func (s *Server) apiRoutes(r chi.Router) {
 			r.Post("/projects/{id}/folders/rename", s.apiRenameFolder)
 			r.Get("/projects/{id}/folders/info", s.apiFolderInfo)
 			r.Get("/projects/{id}/events", s.apiEvents)
+			r.Put("/projects/{id}/pending", s.apiReportPending)
+			r.Post("/diag", s.apiDiag)
+			r.Get("/version", s.apiVersion)
 			r.Get("/stream", s.apiStream)
 
 			r.Post("/chunks/missing", s.apiMissingChunks)
@@ -102,6 +105,10 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	var ruleErr *rules.Error
 	if errors.As(err, &ruleErr) {
+		// Se anota quién y qué: así se puede saber por qué a alguien «no se le sube» algo.
+		user, _ := currentUser(r)
+		s.log.Info("petición rechazada", slog.String("ruta", r.URL.Path), slog.String("usuario", user.Username),
+			slog.String("código", string(ruleErr.Code)), slog.String("motivo", ruleErr.Message))
 		writeJSON(w, statusForCode(ruleErr.Code), ruleErr)
 		return
 	}

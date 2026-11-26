@@ -22,6 +22,8 @@
   --pill-negative-bg: #ffedea; --pill-negative-ink: #831c1e;
   --pill-warning-bg: #fffbeb; --pill-warning-ink: #92400e;
   --pill-neutral-bg: #eeeeee; --pill-neutral-ink: #3d3d3d;
+  --pill-info-bg: #e3edfb; --pill-info-ink: #173f7a;
+  --git-add: #2e7d32; --git-mod: #b7791f; --git-del: #c4242a; --git-mov: #1d5fbf;
   --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --fs-title: 24px; --fs-section: 16px; --fs-kpi: 30px; --fs-body: 14px; --fs-small: 12px;
   --sidebar-width: 256px;
@@ -420,6 +422,8 @@ ol.steps-small { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; l
     --pill-negative-bg: #3a1618; --pill-negative-ink: #ffb4ab;
     --pill-warning-bg: #33260b; --pill-warning-ink: #f5d08a;
     --pill-neutral-bg: #262b33; --pill-neutral-ink: #d0d3d8;
+    --pill-info-bg: #15263f; --pill-info-ink: #a9c8f5;
+    --git-add: #6fd08c; --git-mod: #f5c46a; --git-del: #ff8a80; --git-mov: #6ea8f7;
     --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4.5 2.5 8 6l-3.5 3.5' fill='none' stroke='%23e8eaed' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
   dialog::backdrop { background: rgb(0 0 0 / 0.6); }
@@ -555,3 +559,73 @@ ul.guide-steps { list-style: disc; }
 .folders-total { font-weight: 500; }
 .remote-note { color: var(--muted); }
 .ledger-head p .btn + .btn { margin-left: 8px; }
+
+
+/* ---------- Tooltips ---------- */
+.tip { position: fixed; z-index: 1000; max-width: min(320px, calc(100vw - 16px)); padding: 6px 10px; border-radius: var(--radius-control); background: var(--primary); color: var(--primary-ink); font-size: var(--fs-small); line-height: 1.4; pointer-events: none; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); }
+.tip[hidden] { display: none; }
+[data-tip]:not(button):not(a):not(input):not(label) { cursor: help; }
+
+/* ---------- Estados tipo git: verde nuevo, amarillo modificado, rojo borrado ---------- */
+.pill.git { gap: 4px; border-left: 3px solid transparent; border-radius: 4px 999px 999px 4px; }
+.pill.git.add { background: var(--pill-positive-bg); color: var(--pill-positive-ink); border-left-color: var(--git-add); }
+.pill.git.mod { background: var(--pill-warning-bg); color: var(--pill-warning-ink); border-left-color: var(--git-mod); }
+.pill.git.del { background: var(--pill-negative-bg); color: var(--pill-negative-ink); border-left-color: var(--git-del); }
+.pill.git.mov { background: var(--pill-info-bg); color: var(--pill-info-ink); border-left-color: var(--git-mov); }
+.git-mark { font-weight: 700; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.git-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+tr.git-row.add > td:first-child { box-shadow: inset 3px 0 0 var(--git-add); }
+tr.git-row.mod > td:first-child { box-shadow: inset 3px 0 0 var(--git-mod); }
+tr.git-row.del > td:first-child { box-shadow: inset 3px 0 0 var(--git-del); }
+tr.git-row.mov > td:first-child { box-shadow: inset 3px 0 0 var(--git-mov); }
+tr.git-row.del .name { text-decoration: line-through; text-decoration-color: var(--git-del); }
+
+/* Cambios sin subir de cada PC, en la página del proyecto */
+.pending-pcs { margin-bottom: var(--gap); padding: var(--card-pad); }
+.pending-head h2 { font-size: var(--fs-section); }
+.pending-head .sub { margin-top: 2px; color: var(--muted); }
+.pending-pc { margin-top: 12px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.pending-pc summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pending-pc summary .sub { color: var(--muted); font-size: var(--fs-small); }
+.pending-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.pending-list li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pending-list .path { overflow-wrap: anywhere; font-size: var(--fs-small); }
+.pending-list .pill { min-width: 108px; }
+.sync-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 var(--gap); color: var(--muted); font-size: var(--fs-small); }
+
+/* Mi carpeta: el permiso que falta y la barra para subir (el «commit») */
+.resume-call { margin-bottom: var(--gap); padding: var(--card-pad); border: 2px solid var(--git-mod); background: var(--pill-warning-bg); color: var(--text); }
+.resume-call h2 { font-size: 18px; margin-bottom: 6px; }
+.resume-call p, .resume-call ol { margin-bottom: 10px; }
+.btn.big { height: 44px; padding: 0 20px; font-size: 15px; }
+.commit-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: var(--gap); padding: 12px var(--card-pad); position: sticky; top: 0; z-index: 5; }
+.commit-bar .commit-text { flex: 1; min-width: 200px; }
+.commit-bar .commit-text b { display: block; }
+.commit-bar .commit-text .sub { color: var(--muted); font-size: var(--fs-small); }
+.commit-bar.has-changes { border: 2px solid var(--git-mod); }
+.sync-hint { margin-bottom: var(--gap); padding: 8px 12px; border-radius: var(--radius-control); background: var(--pill-info-bg); color: var(--pill-info-ink); font-size: var(--fs-small); }
+.sync-hint a { color: inherit; text-decoration: underline; }
+/* Mi carpeta: lo que hay en la carpeta y no se sube */
+.skipped { margin: 8px 0 var(--gap); }
+.skipped-conflicts { padding: var(--card-pad); border: 2px solid var(--git-mod); margin-bottom: 8px; }
+.skipped-conflicts h3 { font-size: var(--fs-section); margin-bottom: 4px; }
+.skipped-conflicts .sub { color: var(--muted); margin-bottom: 6px; }
+.skipped-conflicts .pending-list li { flex-wrap: wrap; }
+.skipped-conflicts .pending-list .btn { margin-left: auto; }
+.skipped-others { font-size: var(--fs-small); color: var(--muted); }
+.skipped-others .sub { margin: 6px 0; }
+.skipped-list { margin: 0; padding-left: 18px; max-height: 240px; overflow: auto; overflow-wrap: anywhere; }
+#resume-denied h3 { font-size: 18px; margin-bottom: 6px; color: var(--pill-negative-ink); }
+#resume-denied p, #resume-denied ol { margin-bottom: 10px; }
+
+/* Versiones de los programas de cada PC */
+.versions-table code { font-size: .85em; }
+.versions-table tr.outdated td:first-child { box-shadow: inset 3px 0 0 var(--git-mod, #d29922); }
+.version-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin-top: .5rem; }
+.version-row [data-version-state] { font-size: .9em; }
+.title-row > .btn { white-space: nowrap; flex: none; }
+
+/* Mi carpeta: lo último que subió cada persona */
+.team-list { list-style: none; margin: 0; padding: 0; }
+.team-list li { padding: .45rem 0; border-bottom: 1px solid var(--line, rgba(127,127,127,.15)); }
+.team-list li:last-child { border-bottom: 0; }

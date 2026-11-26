@@ -75,6 +75,8 @@ type Server struct {
 	renderSends     renderSends
 	lowDisk         func(free, total int64) bool
 	disk            diskCache
+	pending         pendingStore
+	clients         clientSeen
 }
 
 // New devuelve el manejador HTTP completo.
@@ -264,6 +266,7 @@ func (s *Server) identify(next http.Handler) http.Handler {
 		if method != 0 {
 			ctx = context.WithValue(ctx, userKey, user)
 			ctx = context.WithValue(ctx, authMethodKey, method)
+			s.trackClient(r.WithContext(ctx), user)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

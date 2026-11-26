@@ -38,6 +38,7 @@ type accountData struct {
 	PasswordChanged bool
 	Locks           []assetRow
 	Tokens          []vault.Token
+	Versions        versionsData
 }
 
 func (s *Server) webAccount(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +62,12 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, status in
 		s.webFail(w, r, err)
 		return
 	}
-	data := accountData{PasswordChanged: r.URL.Query().Get("hecho") == "contrasena", Locks: rows, Tokens: tokens}
+	versions, err := s.versionsData(r, user.ID)
+	if err != nil {
+		s.webFail(w, r, err)
+		return
+	}
+	data := accountData{PasswordChanged: r.URL.Query().Get("hecho") == "contrasena", Locks: rows, Tokens: tokens, Versions: versions}
 	s.render(w, r, status, "account", pageData{Title: "Mi cuenta", Active: "account", Error: errorMessage, Data: data})
 }
 

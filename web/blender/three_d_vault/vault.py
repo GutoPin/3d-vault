@@ -192,6 +192,17 @@ def own_version():
         return manifest_version(f.read())
 
 
+def user_agent():
+    ua = "3D-Vault Blender/" + (own_version() or "0")
+    try:
+        import bpy  # noqa: PLC0415: fuera de Blender (pruebas) no está
+
+        ua += f" (Blender {bpy.app.version_string})"
+    except (ImportError, AttributeError):
+        pass
+    return ua
+
+
 # ---------- conexión ----------
 
 CODE_PREFIX = "3DV1:"
@@ -226,7 +237,9 @@ class Api:
             "Authorization": "Bearer " + token,
             "X-Client-Id": client_id,
             "X-Client-Name": urllib.parse.quote(client_name),
-            "User-Agent": "3D-Vault Blender",
+            # El servidor lee de aquí la versión, para mostrar en la web quién tiene
+            # el complemento desactualizado.
+            "User-Agent": user_agent(),
         }
         self.timeout = timeout
         self.ctx = _ssl_context() if self.server.startswith("https:") else None
@@ -413,6 +426,15 @@ class Vault:
         """La versión del complemento que entrega el servidor, si es otra."""
         server = self.api.request("GET", "/blender/version", raw=True).decode().strip()
         return server if server and server != own_version() else None
+
+    def download_addon(self, dest):
+        """Baja el complemento que entrega el servidor a dest (un .zip)."""
+        data = self.api.request("GET", "/blender/3dvault.zip", raw=True)
+        if not data.startswith(b"PK"):
+            raise VaultError("El servidor no devolvió el complemento. Bájalo desde Mi carpeta en la web.")
+        with open(dest, "wb") as f:
+            f.write(data)
+        return dest
 
     def request_unlock(self, st):
         return self.api.request("POST", f"/api/assets/{st['asset']['id']}/request-unlock")

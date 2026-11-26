@@ -8,17 +8,17 @@
   </div>
   <div class="actions">
     {{if .Data.CanRelease}}
-    <form method="post" action="/assets/{{$asset.ID}}/unlock"><button class="btn" type="submit">Liberar</button></form>
+    <form method="post" action="/assets/{{$asset.ID}}/unlock"><button class="btn" type="submit" data-tip="Deja el archivo libre para que otro pueda editarlo">Liberar</button></form>
     {{else if .Data.CanForce}}
     <form method="post" action="/assets/{{$asset.ID}}/unlock"><input type="hidden" name="force" value="1"><button class="btn" type="submit" title="{{$asset.Lock.DisplayName}} podría tener cambios sin subir">Forzar desbloqueo</button></form>
     {{else if not $asset.Lock}}
-    <form method="post" action="/assets/{{$asset.ID}}/lock"><button class="btn" type="submit">Bloquear</button></form>
+    <form method="post" action="/assets/{{$asset.ID}}/lock"><button class="btn" type="submit" data-tip="Avisa que lo estás editando. Nadie podrá subir encima hasta que lo liberes.">Bloquear</button></form>
     {{end}}
     {{if and $asset.Lock (ne $asset.Lock.UserID $.User.ID)}}
     <form method="post" action="/assets/{{$asset.ID}}/request-unlock"><button class="btn" type="submit" title="Le llega un aviso a {{$asset.Lock.DisplayName}}">Pedir que lo libere</button></form>
     {{end}}
-    {{if .Data.CanRender}}<button class="btn" type="button" data-render-send="{{$asset.ID}}">Enviar a render</button>{{end}}
-    <a class="btn primary" href="/versions/{{$asset.HeadVersionID}}/download">Descargar v{{$asset.HeadVersion}}</a>
+    {{if .Data.CanRender}}<button class="btn" type="button" data-render-send="{{$asset.ID}}" data-tip="Manda este archivo y lo que usa a la PC de render">Enviar a render</button>{{end}}
+    <a class="btn primary" href="/versions/{{$asset.HeadVersionID}}/download" data-tip="Descarga la última versión a tu PC (no la sincroniza)">Descargar v{{$asset.HeadVersion}}</a>
   </div>
 </div>
 

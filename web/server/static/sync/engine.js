@@ -15,13 +15,25 @@ const IGNORE = [/\.blend\d+$/i, /\.blend@$/i, /\.conflicto-/i, /\.tmp$/i, /\.crs
 
 export const ignored = (name) => name.toLowerCase() === '.3dvault-tmp' || IGNORE.some((re) => re.test(name));
 
+// skipReason dice por qué no se sincroniza un archivo ignorado, para mostrarlo
+// en vez de esconderlo: un archivo que «no se sube» sin explicación confunde.
+export function skipReason(name) {
+  if (/\.conflicto-/i.test(name)) return 'conflict';
+  if (/\.blend\d+$/i.test(name) || /\.blend@$/i.test(name)) return 'backup';
+  return 'temp';
+}
+
 // keyOf aproxima path_key del servidor: sin mayúsculas y en NFC.
 export const keyOf = (path) => path.normalize('NFC').toLowerCase();
 
-// La versión de la web que dio el servidor la primera vez. Si luego responde con
-// otra, se actualizó: appUpdated avisa para recargar la página.
-let loadedVersion = null;
+// La versión de la web con la que se cargó esta página (la pone el servidor en
+// <meta name="app-version">). Si luego responde con otra, se actualizó:
+// appUpdated avisa para recargar la página. Se envía en cada petición para que
+// la web muestre qué versión tiene cada PC.
+export const loadedVersion = globalThis.document?.querySelector('meta[name="app-version"]')?.content || null;
+let firstSeen = loadedVersion;
 export let appUpdated = false;
+export const markUpdated = () => { appUpdated = true; };
 
 export class ApiError extends Error {
   constructor(status, body) {
@@ -34,6 +46,7 @@ export class ApiError extends Error {
 export class Api {
   constructor(clientId, clientName) {
     this.headers = { 'X-Client-Id': clientId, 'X-Client-Name': encodeURIComponent(clientName) };
+    if (loadedVersion) this.headers['X-App-Version'] = loadedVersion;
   }
 
   async raw(method, url, body) {
@@ -44,7 +57,7 @@ export class Api {
     }
     const res = await fetch(url, { method, headers, body });
     const version = res.headers.get('X-App-Version');
-    if (version && (loadedVersion ??= version) !== version) appUpdated = true;
+    if (version && (firstSeen ??= version) !== version) appUpdated = true;
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
     return res;
   }
@@ -55,15 +68,30 @@ export class Api {
   }
 }
 
+const QUICK_SIZE = 16 << 20;
+const QUICK_PARALLEL = 6;
+
+// mapLimit aplica fn a cada elemento, con a lo más n a la vez.
+async function mapLimit(items, n, fn) {
+  let i = 0;
+  const next = async () => {
+    while (i < items.length) await fn(items[i++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, next));
+}
+
 // walk lista los archivos de una carpeta, con ruta relativa y separador "/".
 // Si se pasa dirs, también anota cada subcarpeta.
-export async function walk(dir, prefix = '', out = new Map(), dirs = null) {
+export async function walk(dir, prefix = '', out = new Map(), dirs = null, skipped = null) {
   for await (const [name, handle] of dir.entries()) {
-    if (ignored(name)) continue;
+    if (ignored(name)) {
+      if (handle.kind === 'file' && name.toLowerCase() !== '.3dvault-tmp') skipped?.push({ path: prefix + name, reason: skipReason(name), handle });
+      continue;
+    }
     const path = prefix + name;
     if (handle.kind === 'directory') {
       dirs?.set(keyOf(path), { path, handle, parent: dir, name });
-      await walk(handle, path + '/', out, dirs);
+      await walk(handle, path + '/', out, dirs, skipped);
     } else out.set(keyOf(path), { path, handle, parent: dir, name });
   }
   return out;
@@ -233,13 +261,23 @@ export class Project {
     this.scans = new Map(); // key → {size, mtime, scan}: evita recalcular archivos que no cambian
     this.pass = null; // {files, bytes, doneFiles, doneBytes}: lo que baja la pasada en curso o la última
     this.rows = [];
+    this.skipped = []; // archivos que no se sincronizan: copias de conflicto, respaldos, temporales
   }
 
   async scanCached(key, file) {
-    const hit = this.scans.get(key);
+    let hit = this.scans.get(key);
     if (hit && sameFile(hit, file)) return hit.scan;
+    // Lo analizado en otra visita a la página, si el archivo no cambió desde entonces.
+    hit = await this.state.getScan?.(key);
+    if (hit && sameFile(hit, file)) {
+      this.scans.set(key, hit);
+      return hit.scan;
+    }
     const result = await scan(file, (n) => this.progress({ key, action: 'Analizando', done: n, total: file.size }));
-    this.scans.set(key, { size: file.size, mtime: file.lastModified, scan: result });
+    hit = { size: file.size, mtime: file.lastModified, scan: result };
+    this.scans.set(key, hit);
+    // Solo vale la pena guardar los grandes: los chicos se analizan al momento.
+    if (file.size >= 8 << 20) await this.state.putScan?.(key, hit);
     return result;
   }
 
@@ -253,6 +291,7 @@ export class Project {
       version: asset.head_version, versionId: asset.head_version_id, sha, size: file.size, mtime: file.lastModified,
     };
     await this.state.put(rec);
+    if (this.scans.get(key)?.size >= 8 << 20) await this.state.deleteScan?.(key); // ya al día: no hace falta
     return rec;
   }
 
@@ -260,13 +299,22 @@ export class Project {
   // nuevas, y resolver conflictos guardando la copia local. Devuelve las filas
   // para la interfaz. confirmFirst recibe el total a bajar en la primera vez.
   async sync({ confirmFirst } = {}) {
+    // Cuánto tarda cada etapa: Mi carpeta avisa al servidor si una pasada es lenta.
+    let t0 = performance.now();
+    const timing = (this.timing = {});
+    const lap = (name) => { const t = performance.now(); timing[name] = Math.round(t - t0); t0 = t; };
     const snap = await this.api.json('GET', `/api/projects/${this.project.id}/snapshot`);
+    lap('servidor');
     this.snap = snap;
     const excluded = this.selection.get(this.project.id);
     const outside = (path) => underAny(path, excluded);
     const localDirs = new Map();
-    const local = await walk(this.root, '', new Map(), localDirs);
+    const skipped = [];
+    const local = await walk(this.root, '', new Map(), localDirs, skipped);
+    lap('carpeta');
+    this.skipped = skipped;
     const states = new Map((await this.state.all(this.project.id)).map((r) => [r.key, r]));
+    lap('estado');
     const rows = [];
 
     if (confirmFirst && (states.size === 0 || this.fresh)) {
@@ -287,13 +335,33 @@ export class Project {
     });
     this.pass = { files: plan.length, bytes: plan.reduce((s, a) => s + a.size_bytes, 0), doneFiles: 0, doneBytes: 0 };
 
+    // Fecha y tamaño de cada archivo, leídos en paralelo: uno por uno, en un disco
+    // de Windows con más de mil archivos, era lo que más tardaba.
+    this.checking = { done: 0, total: snap.assets.length };
+    await mapLimit(snap.assets, 16, async (a) => {
+      const l = local.get(keyOf(a.path));
+      if (l && !outside(a.path)) l.file = await l.handle.getFile().catch(() => null);
+    });
+    lap('leer');
+
     this.remote = { files: 0, bytes: 0 };
     let freed = 0;
+    // Los archivos chicos que solo hay que bajar (no están en la PC) se bajan
+    // varios a la vez al final: uno por uno, mil archivos de caché tardaban mucho.
+    const quick = [];
     for (const asset of snap.assets) {
+      this.checking.done++;
       const key = keyOf(asset.path);
       const row = { key, asset, local: local.get(key), rec: states.get(key) };
       local.delete(key);
       states.delete(key);
+      if (!row.local && (!row.rec || this.fresh) && !outside(asset.path) && asset.size_bytes < QUICK_SIZE) {
+        row.lockedByMe = this.mine(asset.lock);
+        row.status = 'ok';
+        quick.push(row);
+        rows.push(row);
+        continue;
+      }
       try {
         if (outside(asset.path)) {
           // Carpeta que esta PC no sincroniza: se libera el disco, salvo trabajo sin subir.
@@ -313,6 +381,16 @@ export class Project {
       rows.push(row);
     }
 
+    this.checking = null;
+    await mapLimit(quick, QUICK_PARALLEL, async (row) => {
+      try {
+        await this.download(row, null);
+      } catch (err) {
+        row.status = 'error';
+        row.error = err.message;
+      }
+    });
+    lap('comparar');
     // Lo que queda en el estado ya no existe en el servidor: borrado o movido.
     for (const rec of states.values()) {
       const l = local.get(rec.key);
@@ -332,7 +410,10 @@ export class Project {
     } catch (err) {
       this.log(`No se pudieron sincronizar las carpetas: ${err.message}`);
     }
+    lap('carpetas');
     await this.findMoves(rows);
+    lap('movidos');
+    timing.archivos = snap.assets.length;
     rows.sort((a, b) => (a.asset?.path ?? a.local.path).localeCompare(b.asset?.path ?? b.local.path));
     this.rows = rows.filter((r) => !r.movedTo);
     this.fresh = false;
@@ -526,7 +607,8 @@ export class Project {
       return;
     }
 
-    const file = await l.handle.getFile();
+    const file = l.file ?? await l.handle.getFile();
+    l.file = null; // puede cambiar en disco: la próxima vez se vuelve a leer
     let changed = !sameFile(rec, file);
     if (changed) {
       const { manifest } = await this.scanCached(row.key, file);
