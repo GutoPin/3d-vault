@@ -376,7 +376,7 @@ function render() {
           : ui.running && engine.pass?.files ? 'Bajando los archivos de este proyecto. Aparecen aquí al terminar; el avance está arriba.'
           : 'Este proyecto todavía no tiene archivos. Arrástralos aquí o cópialos en su carpeta.'),
         engine && rows.length > 0 && el('p', { class: 'drop-hint' }, 'Arrastra aquí archivos o carpetas para agregarlos al proyecto.')),
-      skippedPanel(p.id, engine),
+      skippedPanel(p.id, engine) ?? '',
     );
   }
   if (!ui.selected.size) box.append(el('p', { class: 'empty' }, 'Marca arriba los proyectos que quieres tener en esta PC.'));

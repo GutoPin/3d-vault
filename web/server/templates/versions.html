@@ -11,6 +11,35 @@
 {{if $d.Outdated}}<p class="notice" role="status">{{plural $d.Outdated "programa desactualizado" "programas desactualizados"}}. Mi carpeta se actualiza sola al recargar la página. El complemento de Blender hay que instalarlo de nuevo una vez: después se actualiza con un botón desde Blender.</p>
 {{else if $d.Clients}}<p class="notice ok" role="status">Todas las PCs tienen la última versión.</p>{{end}}
 
+<div class="ledger-head">
+  <h2>Puesta al día</h2>
+  <p>{{$d.SetupDone}} de {{len $d.Setup}} modeladores terminaron. Quien no termine ve un aviso arriba en todas las páginas hasta el {{$d.SetupUntil}}.</p>
+</div>
+<div class="panel table-panel">
+  {{if $d.Setup}}
+  <div class="table-wrap">
+    <table class="stack-table setup-table">
+      <thead><tr><th>Persona</th><th>Mi carpeta al día</th><th>Blender {{$d.BlenderVersion}}</th><th>Sabe que guardar no es subir</th><th></th></tr></thead>
+      <tbody>
+      {{range $d.Setup}}
+        <tr{{if not .Done}} class="outdated"{{end}}>
+          <td><span class="name">{{.Who}}</span></td>
+          <td data-label="Mi carpeta:">{{if .Web}}<span class="pill pos" data-tip="{{.WebDetail}}">Sí</span>{{else}}<span class="pill warn" data-tip="No ha abierto Mi carpeta con la versión nueva">Falta</span>{{end}}</td>
+          <td data-label="Blender:">{{if .Blender}}<span class="pill pos" data-tip="{{.BlenderDetail}}">Sí</span>{{else if .BlenderOld}}<span class="pill warn" data-tip="{{.BlenderDetail}}">Versión vieja</span>{{else}}<span class="pill warn" data-tip="Aún no conectó el complemento">Falta</span>{{end}}</td>
+          <td data-label="Entendió:">{{if .Ack}}<span class="pill pos">Sí</span>{{else}}<span class="pill warn">Falta</span>{{end}}</td>
+          <td class="n">{{if .Done}}Listo{{else}}{{plural .Left "paso pendiente" "pasos pendientes"}}{{end}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}<p class="empty">No hay modeladores activos.</p>{{end}}
+</div>
+
+<div class="ledger-head">
+  <h2>Programas por PC</h2>
+  <p>Cada vez que una PC usa Mi carpeta o el panel de Blender, avisa su versión.</p>
+</div>
 <div class="panel table-panel">
   {{if $d.Clients}}{{template "clients" (dict "Clients" $d.Clients "Admin" true)}}
   {{else}}<p class="empty">Aún ninguna PC avisó su versión. Aparecen al abrir Mi carpeta o usar el panel de Blender.</p>{{end}}

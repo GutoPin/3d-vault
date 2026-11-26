@@ -46,6 +46,8 @@ var blenderAddonVersion = func() string {
 type clientSeen struct {
 	mu   sync.Mutex
 	last map[string]seenMark
+	// synced: usuarios ya anotados como «Mi carpeta sincroniza».
+	synced sync.Map
 }
 
 type seenMark struct {
@@ -80,6 +82,9 @@ func (s *Server) trackClient(r *http.Request, user vault.User) {
 
 	now := s.now()
 	key := strconv.FormatInt(user.ID, 10) + "/" + clientID + "/" + app
+	if app == appWeb && version == appVersion && strings.HasSuffix(r.URL.Path, "/snapshot") {
+		s.noteSynced(r, user.ID)
+	}
 	s.clients.mu.Lock()
 	prev, ok := s.clients.last[key]
 	if name == "" && ok {
@@ -102,6 +107,17 @@ func (s *Server) trackClient(r *http.Request, user vault.User) {
 	})
 	if err != nil && r.Context().Err() == nil {
 		s.log.Warn("no se pudo anotar el programa", slog.Any("error", err))
+	}
+}
+
+// noteSynced anota, una vez por usuario, que su Mi carpeta al día sincroniza.
+func (s *Server) noteSynced(r *http.Request, userID int64) {
+	if _, done := s.clients.synced.LoadOrStore(userID, true); done {
+		return
+	}
+	if err := s.svc.MarkNote(r.Context(), userID, noteSynced); err != nil && r.Context().Err() == nil {
+		s.clients.synced.Delete(userID)
+		s.log.Warn("no se pudo anotar la sincronización", slog.Any("error", err))
 	}
 }
 
@@ -150,7 +166,7 @@ func (s *Server) apiVersion(w http.ResponseWriter, r *http.Request) {
 // clientView es un programa tal como se muestra en Mi cuenta y en Versiones.
 type clientView struct {
 	Who, PC, App, AppLabel, Version, Browser, Ago, Hint string
-	Current                                            bool
+	Current                                             bool
 }
 
 func (s *Server) clientViews(list []vault.SeenClient) []clientView {
@@ -206,6 +222,10 @@ func agoLong(d time.Duration) string {
 }
 
 type versionsData struct {
+	// Setup: el avance de la puesta al día de cada modelador (solo en Versiones).
+	Setup          []setupRow
+	SetupDone      int
+	SetupUntil     string
 	Clients        []clientView
 	Outdated       int
 	WebVersion     string
@@ -233,5 +253,10 @@ func (s *Server) webVersions(w http.ResponseWriter, r *http.Request) {
 		s.webFail(w, r, err)
 		return
 	}
+	if data.Setup, data.SetupDone, err = s.setupOverview(r.Context()); err != nil {
+		s.webFail(w, r, err)
+		return
+	}
+	data.SetupUntil = untilText(setupUntil)
 	s.render(w, r, http.StatusOK, "versions", pageData{Title: "Versiones", Active: "versions", Data: data})
 }

@@ -49,6 +49,7 @@ func loadPages() (*pageSet, error) {
 		"linkKind":      linkKind,
 		"plural":        plural,
 		"appVersion":    func() string { return appVersion },
+		"sub":           func(a, b int) int { return a - b },
 		"dict": func(kv ...any) map[string]any {
 			m := make(map[string]any, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {
@@ -58,7 +59,7 @@ func loadPages() (*pageSet, error) {
 		},
 	}
 	set := &pageSet{templates: make(map[string]*template.Template)}
-	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide", "trash", "versions"} {
+	for _, name := range []string{"login", "projects", "project", "asset", "users", "storage", "message", "sync", "account", "activity", "search", "locks", "guide", "trash", "versions", "setup"} {
 		tmpl, err := template.New("layout.html").Funcs(funcs).ParseFS(web.Files,
 			"server/templates/layout.html", "server/templates/"+name+".html")
 		if err != nil {
@@ -118,7 +119,9 @@ type pageData struct {
 	Error         string
 	// DiskAlert avisa a los admins de que queda poco disco.
 	DiskAlert *diskAlert
-	Data      any
+	// Setup: lo que le falta de la puesta al día, para el aviso de arriba.
+	Setup *setupStatus
+	Data  any
 }
 
 // render ejecuta la plantilla en memoria para no enviar una página a medias.
@@ -138,6 +141,16 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, name
 		}
 		if user.IsAdmin {
 			page.DiskAlert = s.diskAlert()
+		}
+		if s.setupActive(user) && page.Active != "setup" {
+			st, err := s.setupFor(r.Context(), user.ID)
+			if err != nil {
+				s.webFail(w, r, err)
+				return
+			}
+			if !st.Done {
+				page.Setup = &st
+			}
 		}
 	}
 
@@ -236,6 +249,7 @@ func (s *Server) webRoutes(r chi.Router) {
 		r.Post("/account/tokens/{id}/revoke", s.webRevokeToken)
 		r.Get("/activity", s.webActivity)
 		r.Get("/guia", s.webGuide)
+		r.Get("/puesta-al-dia", s.webSetup)
 		r.Get("/search", s.webSearch)
 		r.Get("/blender/3dvault.zip", s.blenderAddon)
 		r.Get("/blender/version", s.blenderVersion)

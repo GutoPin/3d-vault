@@ -67,3 +67,40 @@ func (s *Service) ListClients(ctx context.Context, userID int64, since time.Time
 	})
 	return out, err
 }
+
+// MarkNote anota que una persona hizo o confirmó algo. Repetirlo no cambia la fecha.
+func (s *Service) MarkNote(ctx context.Context, userID int64, note string) error {
+	err := s.db.WriteTx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO user_notes (user_id, note, at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
+			userID, note, millis(s.now()))
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("anotar %q: %w", note, err)
+	}
+	return nil
+}
+
+// NoteUsers devuelve quién tiene una nota y desde cuándo.
+func (s *Service) NoteUsers(ctx context.Context, note string) (map[int64]time.Time, error) {
+	out := map[int64]time.Time{}
+	err := s.db.ReadTx(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT user_id, at FROM user_notes WHERE note = ?`, note)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id, at int64
+			if err := rows.Scan(&id, &at); err != nil {
+				return err
+			}
+			out[id] = fromMillis(at)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, fmt.Errorf("leer notas %q: %w", note, err)
+	}
+	return out, nil
+}

@@ -57,6 +57,8 @@ func (s *Server) apiRoutes(r chi.Router) {
 			r.Put("/projects/{id}/pending", s.apiReportPending)
 			r.Post("/diag", s.apiDiag)
 			r.Get("/version", s.apiVersion)
+			r.Get("/setup", s.apiSetup)
+			r.Post("/setup/entendido", s.apiSetupAck)
 			r.Get("/stream", s.apiStream)
 
 			r.Post("/chunks/missing", s.apiMissingChunks)

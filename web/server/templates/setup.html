@@ -1,0 +1,84 @@
+{{define "content"}}
+{{$d := .Data}}{{$s := $d.Status}}
+<div class="title-row">
+  <div>
+    <h1>Ponerme al día</h1>
+    <p class="sub">Tres pasos, unos 5 minutos. Cada paso se marca solo cuando 3D-Vault detecta que lo hiciste: puedes dejar esta página abierta mientras tanto. Hazlo antes del {{$s.Until}}.</p>
+  </div>
+  <p class="setup-count" id="setup-count" aria-live="polite">{{if $s.Done}}Todo listo{{else}}{{sub 3 $s.Left}} de 3 listos{{end}}</p>
+</div>
+
+<p class="notice ok setup-done" id="setup-done" role="status"{{if not $s.Done}} hidden{{end}}>¡Listo! Tu PC está al día. El aviso de arriba ya no saldrá. Recuerda: lo que guardas solo llega a los demás cuando pulsas <b>Subir cambios</b>.</p>
+
+<ol class="setup-steps">
+  <li class="panel setup-step{{if $s.Web}} done{{end}}" data-step="web">
+    <div class="setup-head">
+      <span class="setup-num" aria-hidden="true">1</span>
+      <div>
+        <h2>Abre Mi carpeta en tu PC de trabajo</h2>
+        <p class="sub">Mi carpeta es la página que mantiene tu carpeta igual que el servidor: baja lo que suben los demás y sube lo tuyo. Se actualiza sola, solo hay que abrirla.</p>
+      </div>
+      <span class="setup-state" data-state></span>
+    </div>
+    <ol class="setup-how">
+      <li>Usa <b>Microsoft Edge</b> o <b>Google Chrome</b> en la PC donde trabajas con Blender.</li>
+      <li>Pulsa <b>Abrir Mi carpeta</b>. Si te pide permiso, pulsa <b>Permitir y sincronizar</b> y elige tu carpeta de 3D-Vault (la misma de siempre).</li>
+      <li>Espera a que arriba diga <b>Todo al día</b>. Si ya la tenías abierta, se recarga sola con la versión nueva.</li>
+    </ol>
+    <p class="setup-detail" data-detail>{{$s.WebDetail}}</p>
+    <div class="setup-actions">
+      <a class="btn primary" href="/sync" target="_blank" rel="noopener" data-tip="Se abre en otra pestaña: vuelve aquí después">Abrir Mi carpeta</a>
+      <button class="btn" type="button" id="install-app" hidden data-tip="Mi carpeta tendrá su propio ícono y ventana, como un programa">Instalar como aplicación</button>
+    </div>
+    <p class="sub setup-tip">Recomendado: instálala como aplicación (menú <b>⋯</b> del navegador → <b>Aplicaciones</b> → <b>Instalar este sitio como aplicación</b>) y déjala abierta mientras trabajas. Solo sincroniza mientras está abierta.</p>
+  </li>
+
+  <li class="panel setup-step{{if $s.Blender}} done{{end}}{{if $s.BlenderOld}} old{{end}}" data-step="blender">
+    <div class="setup-head">
+      <span class="setup-num" aria-hidden="true">2</span>
+      <div>
+        <h2>Instala el complemento de Blender {{$d.BlenderVersion}}</h2>
+        <p class="sub">El panel de 3D-Vault dentro de Blender (tecla <b>N</b>): bloquear, subir y actualizar sin salir de Blender. Si ya tenías uno, instálalo igual: el nuevo reemplaza al viejo.</p>
+      </div>
+      <span class="setup-state" data-state></span>
+    </div>
+    <ol class="setup-how">
+      <li><a class="btn" href="/blender/3dvault.zip" download data-tip="Se guarda en Descargas como 3dvault-blender.zip. No lo descomprimas">Descargar el complemento</a></li>
+      <li>En Blender: <b>Editar → Preferencias → Complementos</b>. Arriba a la derecha, la flecha <b>⌄</b> → <b>Instalar desde el disco…</b> y elige <b>3dvault-blender.zip</b> de tu carpeta Descargas.</li>
+      <li>En las mismas Preferencias: <b>Sistema → Red</b> y marca <b>Permitir acceso en línea</b>.</li>
+      <li>Pulsa aquí <b>Generar código</b> y luego <b>Copiar</b>:
+        <div class="setup-code">
+          <button class="btn primary" type="button" id="gen-code" data-tip="Crea la conexión entre Blender y tu cuenta. Blender no guarda tu contraseña">Generar código</button>
+          <input class="input" id="code" readonly hidden aria-label="Código de conexión para Blender">
+          <button class="btn" type="button" id="copy-code" hidden>Copiar</button>
+        </div>
+        <p class="sub" id="code-msg" aria-live="polite"></p>
+      </li>
+      <li>En Blender, en <b>Complementos</b>, despliega <b>3D-Vault</b>, pega el código en <b>Código de conexión</b> y pulsa <b>Probar conexión</b>. Debe decir «Conectado como …».</li>
+    </ol>
+    <p class="setup-detail" data-detail>{{$s.BlenderDetail}}</p>
+    <p class="sub setup-tip">Este paso se marca solo cuando Blender se conecta con la versión {{$d.BlenderVersion}}. Si no se marca en un minuto, vuelve a pulsar <b>Probar conexión</b> en Blender. Si dice que la conexión ya no es válida, genera un código nuevo aquí.</p>
+  </li>
+
+  <li class="panel setup-step{{if $s.Ack}} done{{end}}" data-step="ack">
+    <div class="setup-head">
+      <span class="setup-num" aria-hidden="true">3</span>
+      <div>
+        <h2>Guardar no es subir</h2>
+        <p class="sub">Es la causa de casi todos los «no me aparece lo que subió». Léelo y pulsa <b>Entendido</b>:</p>
+      </div>
+      <span class="setup-state" data-state></span>
+    </div>
+    <ul class="setup-rules">
+      <li><b>Guardar en Blender</b> deja el cambio <b>solo en tu PC</b>. Mi carpeta lo pinta en <span class="pill git mod"><span class="git-mark" aria-hidden="true">~</span>amarillo</span> (modificado) o <span class="pill git add"><span class="git-mark" aria-hidden="true">+</span>verde</span> (nuevo).</li>
+      <li>Para que los demás lo reciban, pulsa <b>Subir cambios</b> arriba en Mi carpeta (o <b>Subir</b> en el panel de Blender) y escribe qué cambiaste.</li>
+      <li>Antes de editar un archivo, <b>bloquéalo</b>: así nadie sube encima. Al terminar, súbelo y se libera.</li>
+      <li>Lo que suben los demás te llega solo <b>mientras Mi carpeta esté abierta</b>.</li>
+    </ul>
+    <div class="setup-actions">
+      <button class="btn primary" type="button" id="ack"{{if $s.Ack}} hidden{{end}}>Entendido</button>
+    </div>
+  </li>
+</ol>
+<script type="module" src="/static/setup.js"></script>
+{{end}}

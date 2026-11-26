@@ -72,6 +72,13 @@
     </div>
   </nav>
   <main class="canvas">
+    {{with .Setup}}<section class="setup-banner" role="status" aria-label="Puesta al día">
+      <div>
+        <b>Pon tu PC al día con 3D-Vault: {{if eq .Left 1}}te falta 1 paso{{else}}te faltan {{.Left}} pasos{{end}}</b>
+        <span>Unos 5 minutos. Sin esto, puede que tus archivos no se suban y que no veas lo que suben los demás. Hazlo antes del {{.Until}}.</span>
+      </div>
+      <a class="btn primary big" href="/puesta-al-dia" data-tip="Te guía paso a paso y marca cada paso cuando lo detecta">Ponerme al día</a>
+    </section>{{end}}
     {{with .DiskAlert}}<p class="disk-alert" role="status">Queda poco espacio en el disco del servidor: {{formatBytes .Free}} libres ({{formatPercent .Percent}}). <a href="/admin/storage">Ver Espacio</a></p>{{end}}
     {{if .Error}}<p class="notice" role="alert">{{.Error}}</p>{{end}}
     {{template "content" .}}
